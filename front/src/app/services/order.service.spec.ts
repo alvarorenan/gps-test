@@ -1,39 +1,20 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { OrderService } from './order.service';
-import { Order, OrderItem } from '../models/order.model';
+import { Order, OrderStatus } from '../models';
+import { environment } from '../environment';
 
 describe('OrderService', () => {
   let service: OrderService;
   let httpMock: HttpTestingController;
-
-  // Mock data for testing
-  const mockOrderItems: OrderItem[] = [
-    {
-      productId: '1',
-      productName: 'Product 1',
-      quantity: 2,
-      unitPrice: 10.0,
-      totalPrice: 20.0
-    },
-    {
-      productId: '2',
-      productName: 'Product 2',
-      quantity: 1,
-      unitPrice: 15.0,
-      totalPrice: 15.0
-    }
-  ];
+  const baseUrl = environment.api + '/orders';
 
   const mockOrder: Order = {
-    id: '123',
+    id: '1',
     clientId: 'client-1',
-    clientName: 'John Doe',
-    items: mockOrderItems,
-    totalAmount: 35.0,
-    status: 'pending',
-    createdAt: new Date('2023-01-01'),
-    updatedAt: new Date('2023-01-01')
+    productIds: ['prod-1', 'prod-2'],
+    status: 'Created',
+    createdAt: '2023-01-01T10:00:00Z'
   };
 
   beforeEach(() => {
@@ -57,204 +38,260 @@ describe('OrderService', () => {
     it('should fetch all orders', () => {
       const mockOrders = [mockOrder];
 
-      service.getAllOrders().subscribe(orders => {
+      service.list().subscribe(orders => {
         expect(orders).toEqual(mockOrders);
         expect(orders.length).toBe(1);
+        expect(orders[0].status).toBe('Created');
       });
 
-      const req = httpMock.expectOne('http://localhost:8080/api/orders');
+      const req = httpMock.expectOne(baseUrl);
       expect(req.request.method).toBe('GET');
       req.flush(mockOrders);
     });
 
-    it('should fetch order by id', () => {
-      const orderId = '123';
-
-      service.getOrderById(orderId).subscribe(order => {
+    it('should get single order by ID', () => {
+      service.get('1').subscribe(order => {
         expect(order).toEqual(mockOrder);
-        expect(order?.id).toBe(orderId);
+        expect(order.id).toBe('1');
       });
 
-      const req = httpMock.expectOne(`http://localhost:8080/api/orders/${orderId}`);
+      const req = httpMock.expectOne(`${baseUrl}/1`);
       expect(req.request.method).toBe('GET');
       req.flush(mockOrder);
     });
 
-    it('should create new order', () => {
-      const newOrder = { ...mockOrder };
-      delete (newOrder as any).id;
+    it('should fetch orders by status', () => {
+      const createdOrders = [mockOrder];
 
-      service.createOrder(newOrder).subscribe(order => {
-        expect(order).toEqual(mockOrder);
-        expect(order.id).toBeTruthy();
+      service.listByStatus('Created').subscribe(orders => {
+        expect(orders).toEqual(createdOrders);
+        expect(orders.every(o => o.status === 'Created')).toBe(true);
       });
 
-      const req = httpMock.expectOne('http://localhost:8080/api/orders');
+      const req = httpMock.expectOne(`${baseUrl}/status/Created`);
+      expect(req.request.method).toBe('GET');
+      req.flush(createdOrders);
+    });
+
+    it('should create new order', () => {
+      const newOrderData = { clientId: 'client-2', productIds: ['prod-3'] };
+      const createdOrder = { 
+        id: '2', 
+        ...newOrderData, 
+        status: 'Created' as OrderStatus,
+        createdAt: '2023-01-02T10:00:00Z'
+      };
+
+      service.create(newOrderData).subscribe(order => {
+        expect(order).toEqual(createdOrder);
+        expect(order.clientId).toBe(newOrderData.clientId);
+        expect(order.productIds).toEqual(newOrderData.productIds);
+      });
+
+      const req = httpMock.expectOne(baseUrl);
       expect(req.request.method).toBe('POST');
-      expect(req.request.body).toEqual(newOrder);
-      req.flush(mockOrder);
+      expect(req.request.body).toEqual(newOrderData);
+      req.flush(createdOrder);
     });
 
     it('should pay order', () => {
-      const paidOrder = { ...mockOrder, status: 'paid' as const };
-
-      service.payOrder(mockOrder.id).subscribe(order => {
-        expect(order.status).toBe('paid');
-        expect(order.id).toBe(mockOrder.id);
+      service.pay('1').subscribe(response => {
+        expect(response).toBeDefined();
       });
 
-      const req = httpMock.expectOne(`http://localhost:8080/api/orders/${mockOrder.id}/pay`);
+      const req = httpMock.expectOne(`${baseUrl}/1/pay`);
       expect(req.request.method).toBe('POST');
-      req.flush(paidOrder);
+      expect(req.request.body).toEqual({});
+      req.flush({ success: true });
     });
 
     it('should cancel order', () => {
-      const canceledOrder = { ...mockOrder, status: 'canceled' as const };
-
-      service.cancelOrder(mockOrder.id).subscribe(order => {
-        expect(order.status).toBe('canceled');
-        expect(order.id).toBe(mockOrder.id);
+      service.cancel('1').subscribe(response => {
+        expect(response).toBeDefined();
       });
 
-      const req = httpMock.expectOne(`http://localhost:8080/api/orders/${mockOrder.id}/cancel`);
+      const req = httpMock.expectOne(`${baseUrl}/1/cancel`);
       expect(req.request.method).toBe('POST');
-      req.flush(canceledOrder);
+      expect(req.request.body).toEqual({});
+      req.flush({ success: true });
+    });
+
+    it('should get order total', () => {
+      const expectedTotal = 250.75;
+
+      service.total('1').subscribe(total => {
+        expect(total).toBe(expectedTotal);
+        expect(typeof total).toBe('number');
+      });
+
+      const req = httpMock.expectOne(`${baseUrl}/1/total`);
+      expect(req.request.method).toBe('GET');
+      req.flush(expectedTotal);
     });
   });
 
-  describe('Business Logic - Order Calculations', () => {
-    it('should calculate order total correctly', () => {
-      const total = service.calculateOrderTotal(mockOrderItems);
-      expect(total).toBe(35.0);
+  describe('Status-based Operations', () => {
+    it('should filter orders by Created status', () => {
+      const createdOrders = [
+        { ...mockOrder, id: '1', status: 'Created' as OrderStatus },
+        { ...mockOrder, id: '2', status: 'Created' as OrderStatus }
+      ];
+
+      service.listByStatus('Created').subscribe(orders => {
+        expect(orders.length).toBe(2);
+        expect(orders.every(o => o.status === 'Created')).toBe(true);
+      });
+
+      const req = httpMock.expectOne(`${baseUrl}/status/Created`);
+      req.flush(createdOrders);
     });
 
-    it('should calculate total for empty items', () => {
-      const total = service.calculateOrderTotal([]);
-      expect(total).toBe(0);
+    it('should filter orders by Paid status', () => {
+      const paidOrders = [
+        { ...mockOrder, id: '3', status: 'Paid' as OrderStatus }
+      ];
+
+      service.listByStatus('Paid').subscribe(orders => {
+        expect(orders.length).toBe(1);
+        expect(orders[0].status).toBe('Paid');
+      });
+
+      const req = httpMock.expectOne(`${baseUrl}/status/Paid`);
+      req.flush(paidOrders);
     });
 
-    it('should calculate total for single item', () => {
-      const singleItem: OrderItem[] = [{
-        productId: '1',
-        productName: 'Test Product',
-        quantity: 3,
-        unitPrice: 12.50,
-        totalPrice: 37.50
-      }];
-      
-      const total = service.calculateOrderTotal(singleItem);
-      expect(total).toBe(37.50);
-    });
-  });
+    it('should filter orders by Canceled status', () => {
+      const canceledOrders = [
+        { ...mockOrder, id: '4', status: 'Canceled' as OrderStatus }
+      ];
 
-  describe('Business Logic - Order Validation', () => {
-    it('should validate correct order items', () => {
-      const isValid = service.validateOrderItems(mockOrderItems);
-      expect(isValid).toBe(true);
-    });
+      service.listByStatus('Canceled').subscribe(orders => {
+        expect(orders.length).toBe(1);
+        expect(orders[0].status).toBe('Canceled');
+      });
 
-    it('should reject empty order items', () => {
-      const isValid = service.validateOrderItems([]);
-      expect(isValid).toBe(false);
-    });
-
-    it('should reject items with zero quantity', () => {
-      const invalidItems: OrderItem[] = [{
-        productId: '1',
-        productName: 'Test Product',
-        quantity: 0,
-        unitPrice: 10.0,
-        totalPrice: 0
-      }];
-
-      const isValid = service.validateOrderItems(invalidItems);
-      expect(isValid).toBe(false);
-    });
-
-    it('should reject items with negative price', () => {
-      const invalidItems: OrderItem[] = [{
-        productId: '1',
-        productName: 'Test Product',
-        quantity: 1,
-        unitPrice: -10.0,
-        totalPrice: -10.0
-      }];
-
-      const isValid = service.validateOrderItems(invalidItems);
-      expect(isValid).toBe(false);
-    });
-
-    it('should reject items without product info', () => {
-      const invalidItems: OrderItem[] = [{
-        productId: '',
-        productName: '',
-        quantity: 1,
-        unitPrice: 10.0,
-        totalPrice: 10.0
-      }];
-
-      const isValid = service.validateOrderItems(invalidItems);
-      expect(isValid).toBe(false);
+      const req = httpMock.expectOne(`${baseUrl}/status/Canceled`);
+      req.flush(canceledOrders);
     });
   });
 
-  describe('Business Logic - Order Status Rules', () => {
-    it('should allow canceling pending orders', () => {
-      const pendingOrder = { ...mockOrder, status: 'pending' as const };
-      expect(service.canCancelOrder(pendingOrder)).toBe(true);
+  describe('Order Management', () => {
+    it('should handle orders with multiple products', () => {
+      const multiProductOrder = {
+        ...mockOrder,
+        productIds: ['prod-1', 'prod-2', 'prod-3', 'prod-4']
+      };
+
+      service.get('1').subscribe(order => {
+        expect(order.productIds.length).toBe(4);
+        expect(order.productIds).toContain('prod-1');
+        expect(order.productIds).toContain('prod-4');
+      });
+
+      const req = httpMock.expectOne(`${baseUrl}/1`);
+      req.flush(multiProductOrder);
     });
 
-    it('should not allow canceling paid orders', () => {
-      const paidOrder = { ...mockOrder, status: 'paid' as const };
-      expect(service.canCancelOrder(paidOrder)).toBe(false);
-    });
+    it('should handle orders with single product', () => {
+      const singleProductOrder = {
+        ...mockOrder,
+        productIds: ['prod-1']
+      };
 
-    it('should not allow canceling already canceled orders', () => {
-      const canceledOrder = { ...mockOrder, status: 'canceled' as const };
-      expect(service.canCancelOrder(canceledOrder)).toBe(false);
-    });
+      service.get('1').subscribe(order => {
+        expect(order.productIds.length).toBe(1);
+        expect(order.productIds[0]).toBe('prod-1');
+      });
 
-    it('should allow paying pending orders', () => {
-      const pendingOrder = { ...mockOrder, status: 'pending' as const };
-      expect(service.canPayOrder(pendingOrder)).toBe(true);
-    });
-
-    it('should not allow paying already paid orders', () => {
-      const paidOrder = { ...mockOrder, status: 'paid' as const };
-      expect(service.canPayOrder(paidOrder)).toBe(false);
-    });
-
-    it('should not allow paying canceled orders', () => {
-      const canceledOrder = { ...mockOrder, status: 'canceled' as const };
-      expect(service.canPayOrder(canceledOrder)).toBe(false);
+      const req = httpMock.expectOne(`${baseUrl}/1`);
+      req.flush(singleProductOrder);
     });
   });
 
-  describe('Edge Cases', () => {
-    it('should handle HTTP errors gracefully', () => {
-      service.getAllOrders().subscribe({
+  describe('Error Handling', () => {
+    it('should handle HTTP errors for list operations', () => {
+      service.list().subscribe({
         next: () => fail('Should have failed'),
         error: (error) => {
           expect(error.status).toBe(500);
+          expect(error.statusText).toBe('Internal Server Error');
         }
       });
 
-      const req = httpMock.expectOne('http://localhost:8080/api/orders');
-      req.flush('Server Error', { status: 500, statusText: 'Internal Server Error' });
+      const req = httpMock.expectOne(baseUrl);
+      req.flush('Server error', { status: 500, statusText: 'Internal Server Error' });
     });
 
-    it('should handle order not found', () => {
-      const orderId = 'non-existent';
-
-      service.getOrderById(orderId).subscribe({
+    it('should handle not found errors', () => {
+      service.get('nonexistent').subscribe({
         next: () => fail('Should have failed'),
         error: (error) => {
           expect(error.status).toBe(404);
         }
       });
 
-      const req = httpMock.expectOne(`http://localhost:8080/api/orders/${orderId}`);
-      req.flush('Not Found', { status: 404, statusText: 'Not Found' });
+      const req = httpMock.expectOne(`${baseUrl}/nonexistent`);
+      req.flush('Not found', { status: 404, statusText: 'Not Found' });
+    });
+
+    it('should handle payment failures', () => {
+      service.pay('1').subscribe({
+        next: () => fail('Should have failed'),
+        error: (error) => {
+          expect(error.status).toBe(400);
+          expect(error.statusText).toBe('Bad Request');
+        }
+      });
+
+      const req = httpMock.expectOne(`${baseUrl}/1/pay`);
+      req.flush('Payment failed', { status: 400, statusText: 'Bad Request' });
+    });
+
+    it('should handle cancellation failures', () => {
+      service.cancel('1').subscribe({
+        next: () => fail('Should have failed'),
+        error: (error) => {
+          expect(error.status).toBe(409);
+          expect(error.statusText).toBe('Conflict');
+        }
+      });
+
+      const req = httpMock.expectOne(`${baseUrl}/1/cancel`);
+      req.flush('Cannot cancel', { status: 409, statusText: 'Conflict' });
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle empty order list', () => {
+      service.list().subscribe(orders => {
+        expect(orders).toEqual([]);
+        expect(orders.length).toBe(0);
+      });
+
+      const req = httpMock.expectOne(baseUrl);
+      req.flush([]);
+    });
+
+    it('should handle zero total', () => {
+      service.total('1').subscribe(total => {
+        expect(total).toBe(0);
+        expect(typeof total).toBe('number');
+      });
+
+      const req = httpMock.expectOne(`${baseUrl}/1/total`);
+      req.flush(0);
+    });
+
+    it('should handle large order totals', () => {
+      const largeTotal = 99999.99;
+
+      service.total('1').subscribe(total => {
+        expect(total).toBe(largeTotal);
+        expect(total).toBeGreaterThan(10000);
+      });
+
+      const req = httpMock.expectOne(`${baseUrl}/1/total`);
+      req.flush(largeTotal);
     });
   });
 });
