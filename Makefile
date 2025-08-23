@@ -3,7 +3,7 @@
 .PHONY: up down logs clean help test-back test-front
 
 up: ## Start all services (database, backend, frontend)
-	docker compose up --build -d
+	docker compose up --build
 	@echo "🚀 Services started:"
 	@echo "   Frontend: http://localhost"
 	@echo "   Backend API: http://localhost:8080"
