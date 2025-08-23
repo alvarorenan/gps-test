@@ -1,4 +1,4 @@
-﻿using GpsTest.DTOs;
+using GpsTest.DTOs;
 using GpsTest.Models;
 using GpsTest.Repositories;
 using GpsTest.Services;
@@ -19,29 +19,33 @@ var connString = Environment.GetEnvironmentVariable("POSTGRES_CONNECTION") ??
 builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseNpgsql(connString));
 
+// Repository Layer
 builder.Services.AddScoped<IRepository<Client>, EfRepository<Client>>();
 builder.Services.AddScoped<IRepository<Product>, EfRepository<Product>>();
 builder.Services.AddScoped<IOrderRepository, EfOrderRepository>();
+
+// Service Layer
 builder.Services.AddScoped<IHistoryService, HistoryService>();
 builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
+
+// Controller Layer
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
 // CORS configuration
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost", "http://localhost:80")
+        policy.WithOrigins("http://localhost", "http://localhost:80", "http://localhost:4200")
               .AllowAnyMethod()
               .AllowAnyHeader();
     });
-});
-
-// Configure JSON serialization to use string enums
-builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
-{
-    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
 builder.Services.AddEndpointsApiExplorer();
@@ -58,79 +62,13 @@ using (var scope = app.Services.CreateScope())
 
 app.UseCors("AllowFrontend");
 
-app.UseSwagger();
-app.UseSwaggerUI();
-
-app.MapPost("/clients", (CreateClientRequest req, IClientService svc) =>
+if (app.Environment.IsDevelopment())
 {
-    var c = svc.Create(req.Name, req.Cpf);
-    return Results.Created($"/clients/{c.Id}", new ClientResponse(c.Id, c.Name, c.Cpf));
-});
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
-app.MapGet("/clients", (IClientService svc) => svc.GetAll().Select(c => new ClientResponse(c.Id, c.Name, c.Cpf)));
-
-app.MapPost("/products", (CreateProductRequest req, IProductService svc) =>
-{
-    var p = svc.Create(req.Name, req.Price);
-    return Results.Created($"/products/{p.Id}", new ProductResponse(p.Id, p.Name, p.Price));
-});
-
-app.MapGet("/products", (IProductService svc) => svc.GetAll().Select(p => new ProductResponse(p.Id, p.Name, p.Price)));
-
-app.MapPost("/orders", (CreateOrderRequest req, IOrderService svc) =>
-{
-    if (!req.ProductIds.Any()) return Results.BadRequest("Products required");
-    var o = svc.Create(req.ClientId, req.ProductIds);
-    return Results.Created($"/orders/{o.Id}", new OrderResponse(o.Id, o.ClientId, o.ProductIds, o.CreatedAt, o.Status));
-});
-
-app.MapGet("/orders", (IOrderService svc) =>
-{
-    var orders = svc.GetAll();
-    return Results.Ok(orders.Select(o => new OrderResponse(o.Id, o.ClientId, o.ProductIds, o.CreatedAt, o.Status)));
-});
-
-app.MapGet("/orders/{id:guid}", (Guid id, IOrderService svc) =>
-{
-    var o = svc.Get(id);
-    return o is null ? Results.NotFound() : Results.Ok(new OrderResponse(o.Id, o.ClientId, o.ProductIds, o.CreatedAt, o.Status));
-});
-
-app.MapGet("/orders/status/{status}", (string status, IOrderService svc) =>
-{
-    if (!Enum.TryParse<OrderStatus>(status, true, out var st)) return Results.BadRequest("Invalid status");
-    return Results.Ok(svc.GetByStatus(st).Select(o => new OrderResponse(o.Id, o.ClientId, o.ProductIds, o.CreatedAt, o.Status)));
-});
-
-app.MapPost("/orders/{id:guid}/pay", (Guid id, IOrderService svc) =>
-{
-    try { svc.Pay(id); return Results.Ok(); }
-    catch (KeyNotFoundException) { return Results.NotFound(); }
-    catch (InvalidOperationException ex) { return Results.BadRequest(ex.Message); }
-});
-
-app.MapPost("/orders/{id:guid}/cancel", (Guid id, IOrderService svc) =>
-{
-    try { svc.Cancel(id); return Results.Ok(); }
-    catch (KeyNotFoundException) { return Results.NotFound(); }
-    catch (InvalidOperationException ex) { return Results.BadRequest(ex.Message); }
-});
-
-app.MapGet("/orders/{id:guid}/total", (Guid id, IOrderService svc, IProductService productSvc) =>
-{
-    try
-    {
-        decimal PriceResolver(Guid pid) => productSvc.Get(pid)?.Price ?? 0m;
-        var total = svc.GetTotal(id, PriceResolver);
-        return Results.Ok(total);
-    }
-    catch (KeyNotFoundException) { return Results.NotFound(); }
-});
-
-app.MapGet("/history", (IHistoryService svc) =>
-{
-    var history = svc.GetAll();
-    return Results.Ok(history);
-});
+// Controller-based routing (instead of minimal APIs)
+app.MapControllers();
 
 app.Run();
