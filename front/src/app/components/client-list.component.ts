@@ -1,13 +1,13 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ClientService } from '../services';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormsModule } from '@angular/forms';
 import { Client } from '../models';
 
 @Component({
   standalone:true,
   selector:'app-client-list',
-  imports:[CommonModule, ReactiveFormsModule],
+  imports:[CommonModule, ReactiveFormsModule, FormsModule],
   template:`
     <div class="row">
       <div class="col-12">
@@ -64,13 +64,42 @@ import { Client } from '../models';
         <div *ngIf="clients().length" class="table-responsive">
           <table class="table table-striped">
             <thead class="table-dark">
-              <tr><th>Nome</th><th>CPF</th><th>ID</th></tr>
+              <tr><th>Nome</th><th>CPF</th><th>ID</th><th>Ações</th></tr>
             </thead>
             <tbody>
               <tr *ngFor="let c of clients()">
-                <td>{{c.name}}</td>
-                <td>{{formatCpfDisplay(c.cpf)}}</td>
+                <td>
+                  <span *ngIf="editingId !== c.id">{{c.name}}</span>
+                  <input *ngIf="editingId === c.id" 
+                         [(ngModel)]="editForm.name" 
+                         class="form-control form-control-sm">
+                </td>
+                <td>
+                  <span *ngIf="editingId !== c.id">{{formatCpfDisplay(c.cpf)}}</span>
+                  <input *ngIf="editingId === c.id" 
+                         [(ngModel)]="editForm.cpf" 
+                         class="form-control form-control-sm"
+                         (input)="formatEditCpf($event)">
+                </td>
                 <td><small class="text-muted">{{c.id}}</small></td>
+                <td>
+                  <div *ngIf="editingId !== c.id" class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" (click)="startEdit(c)">
+                      <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button class="btn btn-outline-danger" (click)="delete(c)">
+                      <i class="fas fa-trash"></i> Excluir
+                    </button>
+                  </div>
+                  <div *ngIf="editingId === c.id" class="btn-group btn-group-sm">
+                    <button class="btn btn-success" (click)="saveEdit(c.id)">
+                      <i class="fas fa-check"></i> Salvar
+                    </button>
+                    <button class="btn btn-secondary" (click)="cancelEdit()">
+                      <i class="fas fa-times"></i> Cancelar
+                    </button>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -91,6 +120,10 @@ export class ClientListComponent implements OnInit {
   isSubmitting = false;
   showValidationError = false;
   showSuccessMessage = false;
+  
+  // Edição inline
+  editingId: string | null = null;
+  editForm = { name: '', cpf: '' };
 
   constructor() {
     this.clientForm = this.fb.group({
@@ -164,5 +197,62 @@ export class ClientListComponent implements OnInit {
         setTimeout(() => this.showValidationError = false, 5000);
       }
     });
+  }
+
+  startEdit(client: Client) {
+    this.editingId = client.id;
+    this.editForm = {
+      name: client.name,
+      cpf: this.formatCpfDisplay(client.cpf)
+    };
+  }
+
+  cancelEdit() {
+    this.editingId = null;
+    this.editForm = { name: '', cpf: '' };
+  }
+
+  saveEdit(id: string) {
+    const cpfNumbers = this.editForm.cpf.replace(/\D/g, '');
+    
+    this.svc.update(id, {
+      name: this.editForm.name.trim(),
+      cpf: cpfNumbers
+    }).subscribe({
+      next: () => {
+        this.editingId = null;
+        this.refresh();
+      },
+      error: (error) => {
+        console.error('Erro ao atualizar cliente:', error);
+        alert('Erro ao atualizar cliente');
+      }
+    });
+  }
+
+  delete(client: Client) {
+    if (confirm(`Tem certeza que deseja excluir o cliente "${client.name}"?`)) {
+      this.svc.delete(client.id).subscribe({
+        next: () => {
+          this.refresh();
+        },
+        error: (error) => {
+          console.error('Erro ao excluir cliente:', error);
+          alert('Erro ao excluir cliente');
+        }
+      });
+    }
+  }
+
+  formatEditCpf(event: any) {
+    let value = event.target.value.replace(/\D/g, '');
+    
+    if (value.length <= 11) {
+      value = value.replace(/(\d{3})(\d)/, '$1.$2');
+      value = value.replace(/(\d{3})(\d)/, '$1.$2');
+      value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    }
+    
+    this.editForm.cpf = value;
   }
 }

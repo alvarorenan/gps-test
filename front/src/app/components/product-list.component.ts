@@ -2,12 +2,12 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { ProductService } from '../services';
 import { Product } from '../models';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormsModule } from '@angular/forms';
 
 @Component({
   standalone:true,
   selector:'app-product-list',
-  imports:[CommonModule, ReactiveFormsModule],
+  imports:[CommonModule, ReactiveFormsModule, FormsModule],
   template:`
     <div class="row">
       <div class="col-12">
@@ -65,13 +65,44 @@ import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angula
         <div *ngIf="products().length" class="table-responsive">
           <table class="table table-striped">
             <thead class="table-dark">
-              <tr><th>Nome</th><th>Preço</th><th>ID</th></tr>
+              <tr><th>Nome</th><th>Preço</th><th>ID</th><th>Ações</th></tr>
             </thead>
             <tbody>
               <tr *ngFor="let p of products()">
-                <td>{{p.name}}</td>
-                <td>R$ {{p.price | number:'1.2-2'}}</td>
+                <td>
+                  <span *ngIf="editingId !== p.id">{{p.name}}</span>
+                  <input *ngIf="editingId === p.id" 
+                         [(ngModel)]="editForm.name" 
+                         class="form-control form-control-sm">
+                </td>
+                <td>
+                  <span *ngIf="editingId !== p.id">R$ {{p.price | number:'1.2-2'}}</span>
+                  <input *ngIf="editingId === p.id" 
+                         type="number" 
+                         step="0.01" 
+                         min="0"
+                         [(ngModel)]="editForm.price" 
+                         class="form-control form-control-sm">
+                </td>
                 <td><small class="text-muted">{{p.id}}</small></td>
+                <td>
+                  <div *ngIf="editingId !== p.id" class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" (click)="startEdit(p)">
+                      <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button class="btn btn-outline-danger" (click)="delete(p)">
+                      <i class="fas fa-trash"></i> Excluir
+                    </button>
+                  </div>
+                  <div *ngIf="editingId === p.id" class="btn-group btn-group-sm">
+                    <button class="btn btn-success" (click)="saveEdit(p.id)">
+                      <i class="fas fa-check"></i> Salvar
+                    </button>
+                    <button class="btn btn-secondary" (click)="cancelEdit()">
+                      <i class="fas fa-times"></i> Cancelar
+                    </button>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -92,6 +123,10 @@ export class ProductListComponent implements OnInit {
   isSubmitting = false;
   showValidationError = false;
   showSuccessMessage = false;
+  
+  // Edição inline
+  editingId: string | null = null;
+  editForm = { name: '', price: 0 };
 
   constructor() {
     this.productForm = this.fb.group({
@@ -142,5 +177,48 @@ export class ProductListComponent implements OnInit {
         setTimeout(() => this.showValidationError = false, 5000);
       }
     });
+  }
+
+  startEdit(product: Product) {
+    this.editingId = product.id;
+    this.editForm = {
+      name: product.name,
+      price: product.price
+    };
+  }
+
+  cancelEdit() {
+    this.editingId = null;
+    this.editForm = { name: '', price: 0 };
+  }
+
+  saveEdit(id: string) {
+    this.svc.update(id, {
+      name: this.editForm.name.trim(),
+      price: this.editForm.price
+    }).subscribe({
+      next: () => {
+        this.editingId = null;
+        this.refresh();
+      },
+      error: (error) => {
+        console.error('Erro ao atualizar produto:', error);
+        alert('Erro ao atualizar produto');
+      }
+    });
+  }
+
+  delete(product: Product) {
+    if (confirm(`Tem certeza que deseja excluir o produto "${product.name}"?`)) {
+      this.svc.delete(product.id).subscribe({
+        next: () => {
+          this.refresh();
+        },
+        error: (error) => {
+          console.error('Erro ao excluir produto:', error);
+          alert('Erro ao excluir produto');
+        }
+      });
+    }
   }
 }

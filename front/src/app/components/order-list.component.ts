@@ -57,8 +57,12 @@ import { Order, Client, Product, OrderStatus } from '../models';
                   <button class="btn btn-sm btn-success me-2" (click)="pay(o)" [disabled]="o.status!=='Created'">
                     Pagar
                   </button>
-                  <button class="btn btn-sm btn-danger" (click)="cancel(o)" [disabled]="o.status!=='Created'">
+                  <button class="btn btn-sm btn-warning me-2" (click)="cancel(o)" [disabled]="o.status!=='Created'">
                     Cancelar
+                  </button>
+                  <button class="btn btn-sm btn-danger" (click)="delete(o)" 
+                          [disabled]="o.status==='Paid'" title="Não é possível excluir pedidos pagos">
+                    🗑️
                   </button>
                 </td>
               </tr>
@@ -115,6 +119,20 @@ export class OrderListComponent implements OnInit {
   
   pay(o:Order){ this.ordersSvc.pay(o.id).subscribe(()=> this.load()); }
   cancel(o:Order){ this.ordersSvc.cancel(o.id).subscribe(()=> this.load()); }
+  
+  delete(o:Order) {
+    if (o.status === 'Paid') {
+      alert('Não é possível excluir pedidos pagos.');
+      return;
+    }
+    
+    if (confirm(`Tem certeza que deseja excluir o pedido do cliente ${this.clientName(o.clientId)}?`)) {
+      this.ordersSvc.delete(o.id).subscribe(() => {
+        this.load();
+      });
+    }
+  }
+  
   getStatusColor(status: OrderStatus): string {
     switch(status) {
       case 'Created': return 'warning';

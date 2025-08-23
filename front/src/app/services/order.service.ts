@@ -35,6 +35,10 @@ export class OrderService {
     return this.http.post(`${this.base}/${id}/cancel`, {});
   }
 
+  delete(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${id}`);
+  }
+
   total(id: string): Observable<number> {
     return this.http.get<number>(`${this.base}/${id}/total`);
   }

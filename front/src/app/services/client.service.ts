@@ -15,7 +15,19 @@ export class ClientService {
     return this.http.get<Client[]>(this.base);
   }
 
+  get(id: string): Observable<Client> {
+    return this.http.get<Client>(`${this.base}/${id}`);
+  }
+
   create(data: {name: string; cpf: string}): Observable<Client> {
     return this.http.post<Client>(this.base, data);
+  }
+
+  update(id: string, data: {name: string; cpf: string}): Observable<Client> {
+    return this.http.put<Client>(`${this.base}/${id}`, data);
+  }
+
+  delete(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${id}`);
   }
 }
