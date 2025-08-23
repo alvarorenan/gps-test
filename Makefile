@@ -1,6 +1,6 @@
 # Essential Docker Compose commands for GPS Test project
 
-.PHONY: up down logs clean help test-back
+.PHONY: up down logs clean help test-back test-front
 
 up: ## Start all services (database, backend, frontend)
 	docker compose up --build -d
@@ -34,4 +34,15 @@ test-back: ## Run backend tests with real-time verbose output
 		--verbosity normal \
 		--nologo
 	@echo "=================================="
-	@echo "✅ Backend tests completed" 
+	@echo "✅ Backend tests completed"
+
+test-front: ## Run frontend tests with Jest
+	@echo "⚙️  Running frontend tests..."
+	@echo "=================================="
+	@docker run --rm -v $(PWD)/front:/app -w /app node:18-alpine sh -c " \
+		apk add --no-cache python3 make g++ && \
+		npm ci && \
+		npm run test:ci \
+	"
+	@echo "=================================="
+	@echo "✅ Frontend tests completed" 
