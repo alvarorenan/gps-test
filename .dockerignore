@@ -1,0 +1,13 @@
+back/bin
+back/obj
+front/node_modules
+front/dist
+.git
+.gitignore
+*.user
+*.suo
+*.swp
+*.DS_Store
+docker-compose.yml
+Dockerfile*
+README.md

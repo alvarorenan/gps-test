@@ -1,0 +1,56 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: gps-postgres
+    environment:
+      POSTGRES_DB: gpstest
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gpstest"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - gps-network
+
+  # .NET Backend API
+  backend:
+    build: ./back
+    container_name: gps-backend
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: gpstest
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - gps-network
+
+  # Angular Frontend
+  frontend:
+    build: ./front
+    container_name: gps-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - gps-network
+
+networks:
+  gps-network:
+    driver: bridge
+
+volumes:
+  pgdata:

@@ -1,0 +1,30 @@
+# Backend build artifacts
+back/bin/
+back/obj/
+
+# Frontend artifacts  
+front/node_modules/
+front/dist/
+front/.angular/
+
+# VS / tooling
+.vs/
+*.user
+*.suo
+*.swp
+
+# Logs
+*.log
+
+# OS
+*.DS_Store
+
+# Coverage / test
+TestResults/
+coverage*/
+
+# Docker local
+*.pid
+
+# Rider / JetBrains
+.idea/

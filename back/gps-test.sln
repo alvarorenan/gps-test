@@ -1,0 +1,30 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "gps-test", "gps-test.csproj", "{714CA017-E3EB-6F9B-3A1A-1CB85074E1E0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "gps-test.Tests", "gps-test.Tests/gps-test.Tests.csproj", "{3C8C2F55-6F90-4E7A-8A5A-5A50F7D8B9E3}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{714CA017-E3EB-6F9B-3A1A-1CB85074E1E0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{714CA017-E3EB-6F9B-3A1A-1CB85074E1E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{714CA017-E3EB-6F9B-3A1A-1CB85074E1E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{714CA017-E3EB-6F9B-3A1A-1CB85074E1E0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3C8C2F55-6F90-4E7A-8A5A-5A50F7D8B9E3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3C8C2F55-6F90-4E7A-8A5A-5A50F7D8B9E3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3C8C2F55-6F90-4E7A-8A5A-5A50F7D8B9E3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3C8C2F55-6F90-4E7A-8A5A-5A50F7D8B9E3}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {CC1E3EA0-8496-48E7-9904-CE11C27679C5}
+	EndGlobalSection
+EndGlobal

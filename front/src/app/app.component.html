@@ -1,0 +1,15 @@
+<nav class="navbar navbar-dark bg-dark">
+  <div class="container">
+    <span class="navbar-brand">E-Commerce GPS</span>
+    <div class="navbar-nav d-flex flex-row gap-3">
+      <a class="nav-link" routerLink="/clients" routerLinkActive="text-warning" [routerLinkActiveOptions]="{exact: true}">Clientes</a>
+      <a class="nav-link" routerLink="/products" routerLinkActive="text-warning" [routerLinkActiveOptions]="{exact: true}">Produtos</a>
+      <a class="nav-link" routerLink="/orders" routerLinkActive="text-warning" [routerLinkActiveOptions]="{exact: true}">Pedidos</a>
+      <a class="nav-link" routerLink="/orders/new" routerLinkActive="text-warning" [routerLinkActiveOptions]="{exact: true}">Novo Pedido</a>
+      <a class="nav-link" routerLink="/history" routerLinkActive="text-warning" [routerLinkActiveOptions]="{exact: true}">Histórico</a>
+    </div>
+  </div>
+</nav>
+<div class="container mt-4">
+  <router-outlet />
+</div>
