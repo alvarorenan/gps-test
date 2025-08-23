@@ -1,6 +1,6 @@
 # Essential Docker Compose commands for GPS Test project
 
-.PHONY: up down logs clean help
+.PHONY: up down logs clean help test-back
 
 up: ## Start all services (database, backend, frontend)
 	docker compose up --build -d
@@ -25,7 +25,13 @@ help: ## Show available commands
 	@echo "GPS Test - Docker Commands:"
 	@grep -E '^[a-zA-Z_-]+:.*?##' Makefile | awk -F':|##' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$3}'
 
-test:
-	@echo "🧪 Running tests..."
-	docker compose exec backend dotnet test
-	@echo "🧪 Tests completed"
+test-back: ## Run backend tests with real-time verbose output
+	@echo "⚙️  Running backend tests..."
+	@echo "=================================="
+	@docker run --rm -v $(PWD):/src -w /src mcr.microsoft.com/dotnet/sdk:6.0 \
+		dotnet test back/gps-test.Tests/gps-test.Tests.csproj \
+		--logger "console;verbosity=detailed" \
+		--verbosity normal \
+		--nologo
+	@echo "=================================="
+	@echo "✅ Backend tests completed" 

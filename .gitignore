@@ -1,6 +1,8 @@
 # Backend build artifacts
 back/bin/
 back/obj/
+back/gps-test.Tests/bin/
+back/gps-test.Tests/obj/
 
 # Frontend artifacts  
 front/node_modules/

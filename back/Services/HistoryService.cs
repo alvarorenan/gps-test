@@ -23,7 +23,7 @@ public class HistoryService : IHistoryService
         var record = new GenericHistory
         {
             EntityType = typeof(T).Name,
-            EntityId = id,
+            EntityId = id.ToString(), // Converte Guid para string
             Action = action,
             DataSnapshotJson = JsonSerializer.Serialize(entity)
         };
