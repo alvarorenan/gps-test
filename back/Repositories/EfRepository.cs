@@ -28,4 +28,13 @@ public class EfRepository<T> : IRepository<T> where T : class
         _set.Update(entity);
         _ctx.SaveChanges();
     }
+    public void Delete(Guid id)
+    {
+        var entity = Get(id);
+        if (entity != null)
+        {
+            _set.Remove(entity);
+            _ctx.SaveChanges();
+        }
+    }
 }

@@ -28,4 +28,9 @@ public class InMemoryRepository<T> : IRepository<T> where T : class
         if (!_store.ContainsKey(id)) throw new KeyNotFoundException();
         _store[id] = entity;
     }
+
+    public void Delete(Guid id)
+    {
+        _store.TryRemove(id, out _);
+    }
 }

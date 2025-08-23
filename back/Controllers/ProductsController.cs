@@ -39,4 +39,25 @@ public class ProductsController : ControllerBase
 
         return Ok(new ProductResponse(product.Id, product.Name, product.Price));
     }
+
+    [HttpPut("{id:guid}")]
+    public ActionResult<ProductResponse> Update(Guid id, [FromBody] UpdateProductRequest request)
+    {
+        var product = _productService.Update(id, request.Name, request.Price);
+        if (product == null)
+            return NotFound();
+
+        return Ok(new ProductResponse(product.Id, product.Name, product.Price));
+    }
+
+    [HttpDelete("{id:guid}")]
+    public ActionResult Delete(Guid id)
+    {
+        var product = _productService.Get(id);
+        if (product == null)
+            return NotFound();
+
+        _productService.Delete(id);
+        return NoContent();
+    }
 }

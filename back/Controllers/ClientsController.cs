@@ -39,4 +39,25 @@ public class ClientsController : ControllerBase
 
         return Ok(new ClientResponse(client.Id, client.Name, client.Cpf));
     }
+
+    [HttpPut("{id:guid}")]
+    public ActionResult<ClientResponse> Update(Guid id, [FromBody] UpdateClientRequest request)
+    {
+        var client = _clientService.Update(id, request.Name, request.Cpf);
+        if (client == null)
+            return NotFound();
+
+        return Ok(new ClientResponse(client.Id, client.Name, client.Cpf));
+    }
+
+    [HttpDelete("{id:guid}")]
+    public ActionResult Delete(Guid id)
+    {
+        var client = _clientService.Get(id);
+        if (client == null)
+            return NotFound();
+
+        _clientService.Delete(id);
+        return NoContent();
+    }
 }

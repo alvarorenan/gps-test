@@ -108,4 +108,15 @@ public class OrdersController : ControllerBase
             return NotFound();
         }
     }
+
+    [HttpDelete("{id:guid}")]
+    public ActionResult Delete(Guid id)
+    {
+        var order = _orderService.Get(id);
+        if (order == null)
+            return NotFound();
+
+        _orderService.Delete(id);
+        return NoContent();
+    }
 }

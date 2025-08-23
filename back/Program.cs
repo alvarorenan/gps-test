@@ -65,7 +65,11 @@ app.UseCors("AllowFrontend");
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "GPS Test API v1");
+        c.RoutePrefix = string.Empty;
+    });
 }
 
 // Controller-based routing (instead of minimal APIs)

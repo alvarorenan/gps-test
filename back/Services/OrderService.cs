@@ -11,6 +11,7 @@ public interface IOrderService
     IEnumerable<Order> GetByStatus(OrderStatus status);
     void Pay(Guid id);
     void Cancel(Guid id);
+    void Delete(Guid id);
     decimal GetTotal(Guid id, Func<Guid, decimal> priceResolver);
 }
 
@@ -49,6 +50,16 @@ public class OrderService : IOrderService
         o.Cancel();
         _repo.Update(o);
         _history.Record(o, "StatusChanged:Canceled");
+    }
+
+    public void Delete(Guid id)
+    {
+        var order = _repo.Get(id);
+        if (order != null)
+        {
+            _repo.Delete(id);
+            _history.Record(order, "Deleted");
+        }
     }
 
     public decimal GetTotal(Guid id, Func<Guid, decimal> priceResolver)

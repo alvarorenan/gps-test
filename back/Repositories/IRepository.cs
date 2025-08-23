@@ -6,4 +6,5 @@ public interface IRepository<T>
     T? Get(Guid id);
     IEnumerable<T> GetAll();
     void Update(T entity);
+    void Delete(Guid id);
 }

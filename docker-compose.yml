@@ -24,6 +24,7 @@ services:
     build: ./back
     container_name: gps-backend
     environment:
+      ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://0.0.0.0:8080
       POSTGRES_HOST: postgres
       POSTGRES_DB: gpstest
