@@ -70,7 +70,7 @@ export class HistoryListComponent implements OnInit {
   }
 
   load() {
-    this.historySvc.list().subscribe(h => this.history.set(h));
+    this.historySvc.list().subscribe((h: GenericHistory[]) => this.history.set(h));
   }
 
   formatDate(dateString: string): string {
