@@ -30,8 +30,15 @@ public class OrdersController : ControllerBase
     }
 
     [HttpGet]
-    public ActionResult<IEnumerable<OrderResponse>> GetAll()
+    public ActionResult GetAll([FromQuery]int? page, [FromQuery]int? pageSize)
     {
+        if (page.HasValue && pageSize.HasValue)
+        {
+            var result = _orderService.GetPaged(page.Value, pageSize.Value);
+            return Ok(new PagedResult<OrderResponse>(
+                result.Items.Select(o => new OrderResponse(o.Id, o.ClientId, o.ProductIds, o.CreatedAt, o.Status)),
+                page.Value, pageSize.Value, result.TotalCount));
+        }
         var orders = _orderService.GetAll();
         return Ok(orders.Select(o => 
             new OrderResponse(o.Id, o.ClientId, o.ProductIds, o.CreatedAt, o.Status)));

@@ -39,8 +39,15 @@ public class ClientsController : ControllerBase
     }
 
     [HttpGet]
-    public ActionResult<IEnumerable<ClientResponse>> GetAll()
+    public ActionResult GetAll([FromQuery]int? page, [FromQuery]int? pageSize)
     {
+        if (page.HasValue && pageSize.HasValue)
+        {
+            var result = _clientService.GetPaged(page.Value, pageSize.Value);
+            return Ok(new PagedResult<ClientResponse>(
+                result.Items.Select(c => new ClientResponse(c.Id, c.Name, c.Cpf)),
+                page.Value, pageSize.Value, result.TotalCount));
+        }
         var clients = _clientService.GetAll();
         return Ok(clients.Select(c => new ClientResponse(c.Id, c.Name, c.Cpf)));
     }

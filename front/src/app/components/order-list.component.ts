@@ -19,7 +19,7 @@ import { Order, Client, Product, OrderStatus } from '../models';
             <option *ngFor="let s of statuses" [value]="s">{{s}}</option>
           </select>
         </div>
-        <div *ngIf="orders().length" class="table-responsive">
+  <div *ngIf="orders().length" class="table-responsive">
           <table class="table table-striped">
             <thead class="table-dark">
               <tr>
@@ -116,6 +116,21 @@ import { Order, Client, Product, OrderStatus } from '../models';
             </tbody>
           </table>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2" *ngIf="orders().length && !status">
+          <div>
+            <button class="btn btn-sm btn-outline-secondary me-1" (click)="changePage(page()-1)" [disabled]="page()===1">«</button>
+            <span class="small">Página {{page()}} / {{totalPages() || 1}}</span>
+            <button class="btn btn-sm btn-outline-secondary ms-1" (click)="changePage(page()+1)" [disabled]="page()===totalPages()">»</button>
+          </div>
+          <div>
+            <select class="form-select form-select-sm" style="width:auto; display:inline-block" (change)="changePageSize($any($event.target).value)">
+              <option [selected]="pageSize()===5" value="5">5</option>
+              <option [selected]="pageSize()===10" value="10">10</option>
+              <option [selected]="pageSize()===25" value="25">25</option>
+            </select>
+            <span class="small ms-2">Total: {{totalCount()}}</span>
+          </div>
+        </div>
         <div *ngIf="!orders().length" class="alert alert-info">
           {{status ? 'Nenhum pedido encontrado para o status "' + status + '".' : 'Nenhum pedido encontrado.'}}
         </div>
@@ -129,6 +144,7 @@ export class OrderListComponent implements OnInit {
   private productsSvc = inject(ProductService);
   
   orders = signal<Order[]>([]);
+  page = signal(1); pageSize = signal(10); totalPages = signal(0); totalCount = signal(0);
   clients = signal<Client[]>([]);
   products = signal<Product[]>([]);
   status: OrderStatus | '' = '';
@@ -145,17 +161,23 @@ export class OrderListComponent implements OnInit {
   ngOnInit(){
     this.clientsSvc.list().subscribe(c=> this.clients.set(c));
     this.productsSvc.list().subscribe(p=> this.products.set(p));
-    this.load();
+  this.load();
   }
   
   load(){ 
     if (this.status) {
-      this.ordersSvc.listByStatus(this.status).subscribe(os=>{ this.orders.set(os); this.fetchTotals(os); });
+      this.ordersSvc.listByStatus(this.status).subscribe(os=>{ this.orders.set(os); this.fetchTotals(os); this.totalCount.set(os.length); this.totalPages.set(1); });
     } else {
-      // Se não há filtro, buscar todos os pedidos
-      this.ordersSvc.list().subscribe(os=>{ this.orders.set(os); this.fetchTotals(os); });
+      this.loadPage();
     }
   }
+  loadPage(){
+    this.ordersSvc.listPaged(this.page(), this.pageSize()).subscribe(r=>{
+      this.orders.set(r.items); this.totalCount.set(r.totalCount); this.totalPages.set(r.totalPages || Math.ceil(r.totalCount / r.pageSize)); this.fetchTotals(r.items);
+    });
+  }
+  changePage(p:number){ if(p<1||p>this.totalPages()) return; this.page.set(p); this.loadPage(); }
+  changePageSize(size:number){ this.pageSize.set(+size); this.page.set(1); this.loadPage(); }
   fetchTotals(os: Order[]){
     const current: Record<string, number> = {};
     os.forEach(o=> this.ordersSvc.total(o.id).subscribe(t=>{ current[o.id]=t; this.totals.set({...this.totals(), [o.id]:t}); }));

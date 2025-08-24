@@ -35,8 +35,15 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet]
-    public ActionResult<IEnumerable<ProductResponse>> GetAll()
+    public ActionResult GetAll([FromQuery]int? page, [FromQuery]int? pageSize)
     {
+        if (page.HasValue && pageSize.HasValue)
+        {
+            var result = _productService.GetPaged(page.Value, pageSize.Value);
+            return Ok(new PagedResult<ProductResponse>(
+                result.Items.Select(p => new ProductResponse(p.Id, p.Name, p.Price)),
+                page.Value, pageSize.Value, result.TotalCount));
+        }
         var products = _productService.GetAll();
         return Ok(products.Select(p => new ProductResponse(p.Id, p.Name, p.Price)));
     }

@@ -65,7 +65,7 @@ import { CpfFormatterService } from '../services/cpf-formatter.service';
           <button type="button" class="btn-close" (click)="showSuccessMessage = false"></button>
         </div>
 
-        <div *ngIf="clients().length" class="table-responsive">
+  <div *ngIf="clients().length" class="table-responsive">
           <table class="table table-striped">
             <thead class="table-dark">
               <tr><th>Nome</th><th>CPF</th><th>ID</th><th>Ações</th></tr>
@@ -113,6 +113,21 @@ import { CpfFormatterService } from '../services/cpf-formatter.service';
             </tbody>
           </table>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2" *ngIf="clients().length">
+          <div>
+            <button class="btn btn-sm btn-outline-secondary me-1" (click)="changePage(page()-1)" [disabled]="page()===1">«</button>
+            <span class="small">Página {{page()}} / {{totalPages() || 1}}</span>
+            <button class="btn btn-sm btn-outline-secondary ms-1" (click)="changePage(page()+1)" [disabled]="page()===totalPages()">»</button>
+          </div>
+          <div>
+            <select class="form-select form-select-sm" style="width:auto; display:inline-block" (change)="changePageSize($any($event.target).value)">
+              <option [selected]="pageSize()===5" value="5">5</option>
+              <option [selected]="pageSize()===10" value="10">10</option>
+              <option [selected]="pageSize()===25" value="25">25</option>
+            </select>
+            <span class="small ms-2">Total: {{totalCount()}}</span>
+          </div>
+        </div>
         <div *ngIf="!clients().length" class="alert alert-info">
           Nenhum cliente cadastrado ainda.
         </div>
@@ -126,6 +141,7 @@ export class ClientListComponent implements OnInit {
   private cpfFormatter = inject(CpfFormatterService);
   
   clients = signal<Client[]>([]);
+  page = signal(1); pageSize = signal(10); totalPages = signal(0); totalCount = signal(0);
   clientForm: FormGroup;
   isSubmitting = false;
   showValidationError = false;
@@ -145,12 +161,19 @@ export class ClientListComponent implements OnInit {
   }
 
   ngOnInit() { 
-    this.refresh(); 
+    this.loadPage(); 
   }
 
-  refresh() { 
-    this.svc.list().subscribe((cs: Client[]) => this.clients.set(cs)); 
+  loadPage(){
+    this.svc.listPaged(this.page(), this.pageSize()).subscribe(r=>{
+      this.clients.set(r.items);
+      this.totalCount.set(r.totalCount);
+      this.totalPages.set(r.totalPages || Math.ceil(r.totalCount / r.pageSize));
+    });
   }
+  refresh(){ this.loadPage(); }
+  changePage(p:number){ if(p<1||p>this.totalPages()) return; this.page.set(p); this.loadPage(); }
+  changePageSize(size:number){ this.pageSize.set(+size); this.page.set(1); this.loadPage(); }
 
   formatCpf(event: any) {
     const input = event.target;

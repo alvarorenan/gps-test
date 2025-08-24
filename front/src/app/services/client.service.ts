@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Client } from '../models';
+import { Client, PagedResult } from '../models';
 import { environment } from '../environment';
 
 @Injectable({
@@ -13,6 +13,9 @@ export class ClientService {
 
   list(): Observable<Client[]> {
     return this.http.get<Client[]>(this.base);
+  }
+  listPaged(page:number, pageSize:number): Observable<PagedResult<Client>> {
+    return this.http.get<PagedResult<Client>>(`${this.base}?page=${page}&pageSize=${pageSize}`);
   }
 
   get(id: string): Observable<Client> {

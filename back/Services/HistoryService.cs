@@ -9,6 +9,7 @@ public interface IHistoryService
 {
     void Record<T>(T entity, string action) where T : class;
     IEnumerable<GenericHistory> GetAll();
+    (IEnumerable<object> Items, int TotalCount) GetPaged(int page, int pageSize);
 }
 
 public class HistoryService : IHistoryService
@@ -32,4 +33,12 @@ public class HistoryService : IHistoryService
     }
 
     public IEnumerable<GenericHistory> GetAll() => _ctx.History.AsNoTracking().OrderByDescending(h => h.Timestamp).ToList();
+    public (IEnumerable<object> Items, int TotalCount) GetPaged(int page, int pageSize)
+    {
+        if (page < 1) page = 1; if (pageSize < 1) pageSize = 10;
+        var query = _ctx.History.AsNoTracking().OrderByDescending(h => h.Timestamp);
+        var total = query.Count();
+        var items = query.Skip((page-1)*pageSize).Take(pageSize).ToList().Cast<object>();
+        return (items, total);
+    }
 }

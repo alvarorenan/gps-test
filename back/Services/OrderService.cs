@@ -9,6 +9,7 @@ public interface IOrderService
     Order? Get(Guid id);
     IEnumerable<Order> GetAll();
     IEnumerable<Order> GetByStatus(OrderStatus status);
+    (IEnumerable<Order> Items, int TotalCount) GetPaged(int page, int pageSize);
     Order? Update(Guid id, Guid clientId, IEnumerable<Guid> productIds);
     void Pay(Guid id);
     void Cancel(Guid id);
@@ -38,6 +39,7 @@ public class OrderService : IOrderService
     public Order? Get(Guid id) => _repo.Get(id);
     public IEnumerable<Order> GetAll() => _repo.GetAll();
     public IEnumerable<Order> GetByStatus(OrderStatus status) => _repo.GetByStatus(status);
+    public (IEnumerable<Order> Items, int TotalCount) GetPaged(int page, int pageSize) => _repo.GetPaged(page, pageSize);
 
     public Order? Update(Guid id, Guid clientId, IEnumerable<Guid> productIds)
     {

@@ -10,6 +10,7 @@ public interface IClientService
     Client Create(string name, string cpf);
     Client? Get(Guid id);
     IEnumerable<Client> GetAll();
+    (IEnumerable<Client> Items, int TotalCount) GetPaged(int page, int pageSize);
     Client? Update(Guid id, string name, string cpf);
     void Delete(Guid id);
 }
@@ -54,6 +55,7 @@ public class ClientService : IClientService
 
     public Client? Get(Guid id) => _repo.Get(id);
     public IEnumerable<Client> GetAll() => _repo.GetAll();
+    public (IEnumerable<Client> Items, int TotalCount) GetPaged(int page, int pageSize) => _repo.GetPaged(page, pageSize);
 
     public Client? Update(Guid id, string name, string cpf)
     {

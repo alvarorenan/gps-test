@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../environment';
+import { PagedResult } from '../models';
 
 export interface GenericHistory {
   id: string;
@@ -21,5 +22,8 @@ export class HistoryService {
 
   list(): Observable<GenericHistory[]> {
     return this.http.get<GenericHistory[]>(this.base);
+  }
+  listPaged(page:number, pageSize:number): Observable<PagedResult<GenericHistory>> {
+    return this.http.get<PagedResult<GenericHistory>>(`${this.base}?page=${page}&pageSize=${pageSize}`);
   }
 }

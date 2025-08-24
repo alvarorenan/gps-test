@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Order, OrderStatus } from '../models';
+import { Order, OrderStatus, PagedResult } from '../models';
 import { environment } from '../environment';
 
 @Injectable({
@@ -13,6 +13,9 @@ export class OrderService {
 
   list(): Observable<Order[]> {
     return this.http.get<Order[]>(this.base);
+  }
+  listPaged(page:number, pageSize:number): Observable<PagedResult<Order>> {
+    return this.http.get<PagedResult<Order>>(`${this.base}?page=${page}&pageSize=${pageSize}`);
   }
 
   get(id: string): Observable<Order> {

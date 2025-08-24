@@ -10,6 +10,7 @@ public interface IProductService
     Product Create(string name, decimal price);
     Product? Get(Guid id);
     IEnumerable<Product> GetAll();
+    (IEnumerable<Product> Items, int TotalCount) GetPaged(int page, int pageSize);
     Product? Update(Guid id, string name, decimal price);
     void Delete(Guid id);
 }
@@ -48,6 +49,7 @@ public class ProductService : IProductService
 
     public Product? Get(Guid id) => _repo.Get(id);
     public IEnumerable<Product> GetAll() => _repo.GetAll();
+    public (IEnumerable<Product> Items, int TotalCount) GetPaged(int page, int pageSize) => _repo.GetPaged(page, pageSize);
 
     public Product? Update(Guid id, string name, decimal price)
     {

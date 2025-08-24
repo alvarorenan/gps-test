@@ -20,6 +20,15 @@ public class EfRepository<T> : IRepository<T> where T : class, IEntity
     }
     public T? Get(Guid id) => _set.Find(id);
     public IEnumerable<T> GetAll() => _set.ToList();
+    public (IEnumerable<T> Items, int TotalCount) GetPaged(int page, int pageSize)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 10;
+        var query = _set.AsQueryable();
+        var total = query.Count();
+        var items = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        return (items, total);
+    }
     public void Update(T entity)
     {
         _set.Update(entity);

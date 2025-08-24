@@ -65,7 +65,7 @@ import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormsModule } 
           <button type="button" class="btn-close" (click)="showSuccessMessage = false"></button>
         </div>
 
-        <div *ngIf="products().length" class="table-responsive">
+  <div *ngIf="products().length" class="table-responsive">
           <table class="table table-striped">
             <thead class="table-dark">
               <tr><th>Nome</th><th>Preço</th><th>ID</th><th>Ações</th></tr>
@@ -112,6 +112,21 @@ import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormsModule } 
             </tbody>
           </table>
         </div>
+        <div class="d-flex justify-content-between align-items-center mt-2" *ngIf="products().length">
+          <div>
+            <button class="btn btn-sm btn-outline-secondary me-1" (click)="changePage(page()-1)" [disabled]="page()===1">«</button>
+            <span class="small">Página {{page()}} / {{totalPages() || 1}}</span>
+            <button class="btn btn-sm btn-outline-secondary ms-1" (click)="changePage(page()+1)" [disabled]="page()===totalPages()">»</button>
+          </div>
+          <div>
+            <select class="form-select form-select-sm" style="width:auto; display:inline-block" (change)="changePageSize($any($event.target).value)">
+              <option [selected]="pageSize()===5" value="5">5</option>
+              <option [selected]="pageSize()===10" value="10">10</option>
+              <option [selected]="pageSize()===25" value="25">25</option>
+            </select>
+            <span class="small ms-2">Total: {{totalCount()}}</span>
+          </div>
+        </div>
         <div *ngIf="!products().length" class="alert alert-info">
           Nenhum produto cadastrado ainda.
         </div>
@@ -124,6 +139,7 @@ export class ProductListComponent implements OnInit {
   private fb = inject(FormBuilder);
   
   products = signal<Product[]>([]);
+  page = signal(1); pageSize = signal(10); totalPages = signal(0); totalCount = signal(0);
   productForm: FormGroup;
   isSubmitting = false;
   showValidationError = false;
@@ -143,12 +159,19 @@ export class ProductListComponent implements OnInit {
   }
 
   ngOnInit() { 
-    this.refresh(); 
+    this.loadPage(); 
   }
 
-  refresh() { 
-    this.svc.list().subscribe((ps: Product[]) => this.products.set(ps)); 
+  loadPage(){
+    this.svc.listPaged(this.page(), this.pageSize()).subscribe(r=>{
+      this.products.set(r.items);
+      this.totalCount.set(r.totalCount);
+      this.totalPages.set(r.totalPages || Math.ceil(r.totalCount / r.pageSize));
+    });
   }
+  refresh(){ this.loadPage(); }
+  changePage(p:number){ if(p<1||p>this.totalPages()) return; this.page.set(p); this.loadPage(); }
+  changePageSize(size:number){ this.pageSize.set(+size); this.page.set(1); this.loadPage(); }
 
   add() {
     // Validações básicas no frontend
