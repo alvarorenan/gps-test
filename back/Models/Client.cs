@@ -1,6 +1,6 @@
 namespace GpsTest.Models;
 
-public class Client
+public class Client : IEntity
 {
     public Guid Id { get; init; } = Guid.NewGuid();
     public string Name { get; set; } = string.Empty;

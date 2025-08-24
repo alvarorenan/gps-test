@@ -1,6 +1,6 @@
 namespace GpsTest.Models;
 
-public class Order
+public class Order : IEntity
 {
     public Guid Id { get; init; } = Guid.NewGuid();
     public Guid ClientId { get; set; }

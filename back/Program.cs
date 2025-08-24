@@ -21,7 +21,7 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseNpgsql(connString));
 
 // Repository Layer
-builder.Services.AddScoped<IRepository<Client>, EfRepository<Client>>();
+builder.Services.AddScoped<IClientRepository, EfClientRepository>();
 builder.Services.AddScoped<IRepository<Product>, EfRepository<Product>>();
 builder.Services.AddScoped<IOrderRepository, EfOrderRepository>();
 

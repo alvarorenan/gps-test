@@ -1,9 +1,10 @@
 using GpsTest.Data;
+using GpsTest.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace GpsTest.Repositories;
 
-public class EfRepository<T> : IRepository<T> where T : class
+public class EfRepository<T> : IRepository<T> where T : class, IEntity
 {
     protected readonly AppDbContext _ctx;
     protected readonly DbSet<T> _set;
@@ -17,11 +18,7 @@ public class EfRepository<T> : IRepository<T> where T : class
         _ctx.SaveChanges();
         return entity;
     }
-    public T? Get(Guid id)
-    {
-        var prop = typeof(T).GetProperty("Id");
-        return _set.AsEnumerable().FirstOrDefault(e => (Guid)(prop?.GetValue(e) ?? Guid.Empty) == id);
-    }
+    public T? Get(Guid id) => _set.Find(id);
     public IEnumerable<T> GetAll() => _set.ToList();
     public void Update(T entity)
     {

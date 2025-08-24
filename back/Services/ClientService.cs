@@ -16,12 +16,12 @@ public interface IClientService
 
 public class ClientService : IClientService
 {
-    private readonly IRepository<Client> _repo;
+    private readonly IClientRepository _repo;
     private readonly IHistoryService _history;
     private readonly IValidator<ClientValidationDto> _clientValidator;
     
     public ClientService(
-        IRepository<Client> repo, 
+    IClientRepository repo, 
         IHistoryService history,
         IValidator<ClientValidationDto> clientValidator)
     {
@@ -43,11 +43,8 @@ public class ClientService : IClientService
         var cleanCpf = CleanCpf(cpf);
         
         // Verificar se CPF já existe
-        var existingClient = _repo.GetAll().FirstOrDefault(c => c.Cpf == cleanCpf);
-        if (existingClient != null)
-        {
+        if (_repo.ExistsByCpf(cleanCpf))
             throw new InvalidOperationException("CPF já está cadastrado no sistema");
-        }
 
         var c = new Client { Name = name.Trim(), Cpf = cleanCpf };
         _repo.Add(c);
@@ -68,17 +65,14 @@ public class ClientService : IClientService
             throw new ArgumentException($"Dados inválidos: {string.Join(", ", validationResult.Errors)}");
         }
 
-        var client = _repo.Get(id);
-        if (client == null) return null;
+    var client = _repo.Get(id);
+    if (client == null) throw new KeyNotFoundException("Cliente não encontrado");
 
         var cleanCpf = CleanCpf(cpf);
         
         // Verificar se CPF já existe em outro cliente
-        var existingClient = _repo.GetAll().FirstOrDefault(c => c.Cpf == cleanCpf && c.Id != id);
-        if (existingClient != null)
-        {
+        if (_repo.ExistsByCpf(cleanCpf, id))
             throw new InvalidOperationException("CPF já está cadastrado em outro cliente");
-        }
 
         client.Name = name.Trim();
         client.Cpf = cleanCpf;

@@ -27,6 +27,8 @@ public class OrderService : IOrderService
 
     public Order Create(Guid clientId, IEnumerable<Guid> productIds)
     {
+        if (productIds == null || !productIds.Any())
+            throw new ArgumentException("Order must contain at least one product", nameof(productIds));
         var order = new Order { ClientId = clientId, ProductIds = productIds.ToList() };
         _repo.Add(order);
         _history.Record(order, "Created");
@@ -39,6 +41,8 @@ public class OrderService : IOrderService
 
     public Order? Update(Guid id, Guid clientId, IEnumerable<Guid> productIds)
     {
+        if (productIds == null || !productIds.Any())
+            throw new ArgumentException("Order must contain at least one product", nameof(productIds));
         var order = _repo.Get(id) ?? throw new KeyNotFoundException("Order not found");
         order.ClientId = clientId;
         order.ProductIds = productIds.ToList();

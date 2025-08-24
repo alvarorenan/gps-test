@@ -59,8 +59,8 @@ public class ProductService : IProductService
             throw new ArgumentException($"Dados inválidos: {string.Join(", ", validationResult.Errors)}");
         }
 
-        var product = _repo.Get(id);
-        if (product == null) return null;
+    var product = _repo.Get(id);
+    if (product == null) throw new KeyNotFoundException("Produto não encontrado");
 
         product.Name = name.Trim();
         product.Price = price;

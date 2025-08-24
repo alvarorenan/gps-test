@@ -57,10 +57,11 @@ public class ProductsController : ControllerBase
         try
         {
             var product = _productService.Update(id, request.Name, request.Price);
-            if (product == null)
-                return NotFound(new { error = "Produto não encontrado", type = "not_found" });
-
             return Ok(new ProductResponse(product.Id, product.Name, product.Price));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new { error = "Produto não encontrado", type = "not_found" });
         }
         catch (ArgumentException ex)
         {

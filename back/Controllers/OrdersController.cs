@@ -114,13 +114,7 @@ public class OrdersController : ControllerBase
     {
         try
         {
-            if (!request.ProductIds.Any())
-                return BadRequest(new { error = "Pelo menos um produto é obrigatório", type = "validation" });
-
             var order = _orderService.Update(id, request.ClientId, request.ProductIds);
-            if (order == null)
-                return NotFound(new { error = "Pedido não encontrado", type = "not_found" });
-
             return Ok(new OrderResponse(order.Id, order.ClientId, order.ProductIds, order.CreatedAt, order.Status));
         }
         catch (ArgumentException ex)
@@ -130,6 +124,10 @@ public class OrdersController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { error = ex.Message, type = "business_rule" });
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new { error = "Pedido não encontrado", type = "not_found" });
         }
         catch (Exception ex)
         {

@@ -61,10 +61,11 @@ public class ClientsController : ControllerBase
         try
         {
             var client = _clientService.Update(id, request.Name, request.Cpf);
-            if (client == null)
-                return NotFound(new { error = "Cliente não encontrado", type = "not_found" });
-
             return Ok(new ClientResponse(client.Id, client.Name, client.Cpf));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new { error = "Cliente não encontrado", type = "not_found" });
         }
         catch (ArgumentException ex)
         {
