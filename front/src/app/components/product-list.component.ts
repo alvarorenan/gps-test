@@ -36,7 +36,6 @@ import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormsModule } 
               [class.is-invalid]="productForm.get('price')?.invalid && productForm.get('price')?.touched">
             <div class="invalid-feedback" *ngIf="productForm.get('price')?.invalid && productForm.get('price')?.touched">
               <div *ngIf="productForm.get('price')?.errors?.['required']">Preço é obrigatório</div>
-              <div *ngIf="productForm.get('price')?.errors?.['min']">Preço deve ser maior que zero</div>
             </div>
           </div>
           <div class="col-md-4">
@@ -52,7 +51,11 @@ import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormsModule } 
         
         <!-- Mensagem de erro geral -->
         <div *ngIf="showValidationError" class="alert alert-danger alert-dismissible fade show">
-          <strong>Atenção!</strong> Preencha todos os campos obrigatórios corretamente.
+          <strong>Erro de validação:</strong>
+          <ul class="mb-0 mt-1" *ngIf="validationErrors.length > 0">
+            <li *ngFor="let error of validationErrors">{{ error }}</li>
+          </ul>
+          <div *ngIf="validationErrors.length === 0">Preencha todos os campos obrigatórios corretamente.</div>
           <button type="button" class="btn-close" (click)="showValidationError = false"></button>
         </div>
         
@@ -73,16 +76,18 @@ import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormsModule } 
                   <span *ngIf="editingId !== p.id">{{p.name}}</span>
                   <input *ngIf="editingId === p.id" 
                          [(ngModel)]="editForm.name" 
-                         class="form-control form-control-sm">
+                         class="form-control form-control-sm"
+                         [class.is-invalid]="editForm.name.trim().length === 0"
+                         placeholder="Nome obrigatório">
                 </td>
                 <td>
                   <span *ngIf="editingId !== p.id">R$ {{p.price | number:'1.2-2'}}</span>
                   <input *ngIf="editingId === p.id" 
                          type="number" 
                          step="0.01" 
-                         min="0"
                          [(ngModel)]="editForm.price" 
-                         class="form-control form-control-sm">
+                         class="form-control form-control-sm"
+                         placeholder="Preço obrigatório">
                 </td>
                 <td><small class="text-muted">{{p.id}}</small></td>
                 <td>
@@ -123,15 +128,17 @@ export class ProductListComponent implements OnInit {
   isSubmitting = false;
   showValidationError = false;
   showSuccessMessage = false;
+  validationErrors: string[] = [];
   
   // Edição inline
   editingId: string | null = null;
   editForm = { name: '', price: 0 };
+  editValidationErrors: string[] = [];
 
   constructor() {
     this.productForm = this.fb.group({
       name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(200)]],
-      price: [0, [Validators.required, Validators.min(0.01)]]
+      price: [0, [Validators.required]] // Apenas obrigatório, validação de valor > 0 no backend
     });
   }
 
@@ -140,14 +147,15 @@ export class ProductListComponent implements OnInit {
   }
 
   refresh() { 
-    this.svc.list().subscribe(ps => this.products.set(ps)); 
+    this.svc.list().subscribe((ps: Product[]) => this.products.set(ps)); 
   }
 
   add() {
-    // Marcar todos os campos como touched para mostrar validações
+    // Validações básicas no frontend
     this.productForm.markAllAsTouched();
     
     if (this.productForm.invalid) {
+      this.validationErrors = ['Por favor, preencha todos os campos obrigatórios'];
       this.showValidationError = true;
       this.showSuccessMessage = false;
       setTimeout(() => this.showValidationError = false, 5000);
@@ -156,6 +164,7 @@ export class ProductListComponent implements OnInit {
 
     this.isSubmitting = true;
     this.showValidationError = false;
+    this.validationErrors = [];
     
     const formValue = this.productForm.value;
     
@@ -165,14 +174,21 @@ export class ProductListComponent implements OnInit {
     }).subscribe({
       next: () => {
         this.productForm.reset();
-        this.productForm.patchValue({ price: 0 }); // Reset price to 0
+        this.productForm.patchValue({ price: 0 });
         this.showSuccessMessage = true;
         this.isSubmitting = false;
         this.refresh();
         setTimeout(() => this.showSuccessMessage = false, 3000);
       },
-      error: () => {
+      error: (error: any) => {
         this.isSubmitting = false;
+        if (error.error?.error) {
+          this.validationErrors = [error.error.error];
+        } else if (error.status === 400) {
+          this.validationErrors = ['Dados inválidos. Verifique os campos'];
+        } else {
+          this.validationErrors = ['Erro ao criar produto. Tente novamente'];
+        }
         this.showValidationError = true;
         setTimeout(() => this.showValidationError = false, 5000);
       }
@@ -193,17 +209,37 @@ export class ProductListComponent implements OnInit {
   }
 
   saveEdit(id: string) {
+    // Validações básicas de UX apenas
+    if (!this.editForm.name.trim()) {
+      alert('Nome é obrigatório');
+      return;
+    }
+
+    if (this.editForm.price == null || this.editForm.price === undefined) {
+      alert('Preço é obrigatório');
+      return;
+    }
+    
     this.svc.update(id, {
       name: this.editForm.name.trim(),
       price: this.editForm.price
     }).subscribe({
       next: () => {
         this.editingId = null;
+        this.editValidationErrors = [];
         this.refresh();
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('Erro ao atualizar produto:', error);
-        alert('Erro ao atualizar produto');
+        let errorMessage = 'Erro ao atualizar produto';
+        
+        if (error.error?.error) {
+          errorMessage = error.error.error;
+        } else if (error.status === 400) {
+          errorMessage = 'Dados inválidos. Verifique os campos';
+        }
+        
+        alert(errorMessage);
       }
     });
   }
@@ -214,7 +250,7 @@ export class ProductListComponent implements OnInit {
         next: () => {
           this.refresh();
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Erro ao excluir produto:', error);
           alert('Erro ao excluir produto');
         }

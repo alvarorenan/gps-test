@@ -26,20 +26,24 @@ builder.Services.AddScoped<IRepository<Product>, EfRepository<Product>>();
 builder.Services.AddScoped<IOrderRepository, EfOrderRepository>();
 
 // Validators (following SOLID principles)
-builder.Services.AddScoped<IValidator<string>>(provider => 
-{
-    // Composite validator for names using Named instances
-    return new CompositeValidator<string>().AddValidator(new NameValidator());
-});
-
 builder.Services.AddScoped<CpfValidator>();
 builder.Services.AddScoped<NameValidator>();
+builder.Services.AddScoped<PriceValidator>();
 
+// Client Validator
 builder.Services.AddScoped<IValidator<ClientValidationDto>>(provider =>
 {
     var nameValidator = provider.GetRequiredService<NameValidator>();
     var cpfValidator = provider.GetRequiredService<CpfValidator>();
     return new ClientValidator(nameValidator, cpfValidator);
+});
+
+// Product Validator
+builder.Services.AddScoped<IValidator<ProductValidationDto>>(provider =>
+{
+    var nameValidator = provider.GetRequiredService<NameValidator>();
+    var priceValidator = provider.GetRequiredService<PriceValidator>();
+    return new ProductValidator(nameValidator, priceValidator);
 });
 
 // Service Layer

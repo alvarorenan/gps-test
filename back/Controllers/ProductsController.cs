@@ -18,9 +18,20 @@ public class ProductsController : ControllerBase
     [HttpPost]
     public ActionResult<ProductResponse> Create([FromBody] CreateProductRequest request)
     {
-        var product = _productService.Create(request.Name, request.Price);
-        return CreatedAtAction(nameof(GetById), new { id = product.Id }, 
-            new ProductResponse(product.Id, product.Name, product.Price));
+        try
+        {
+            var product = _productService.Create(request.Name, request.Price);
+            return CreatedAtAction(nameof(GetById), new { id = product.Id }, 
+                new ProductResponse(product.Id, product.Name, product.Price));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message, type = "validation" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Erro interno do servidor", type = "server_error" });
+        }
     }
 
     [HttpGet]
@@ -43,11 +54,22 @@ public class ProductsController : ControllerBase
     [HttpPut("{id:guid}")]
     public ActionResult<ProductResponse> Update(Guid id, [FromBody] UpdateProductRequest request)
     {
-        var product = _productService.Update(id, request.Name, request.Price);
-        if (product == null)
-            return NotFound();
+        try
+        {
+            var product = _productService.Update(id, request.Name, request.Price);
+            if (product == null)
+                return NotFound(new { error = "Produto não encontrado", type = "not_found" });
 
-        return Ok(new ProductResponse(product.Id, product.Name, product.Price));
+            return Ok(new ProductResponse(product.Id, product.Name, product.Price));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message, type = "validation" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Erro interno do servidor", type = "server_error" });
+        }
     }
 
     [HttpDelete("{id:guid}")]

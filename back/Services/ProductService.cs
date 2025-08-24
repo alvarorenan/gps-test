@@ -1,5 +1,7 @@
 using GpsTest.Models;
 using GpsTest.Repositories;
+using GpsTest.Validators;
+using GpsTest.DTOs;
 
 namespace GpsTest.Services;
 
@@ -16,14 +18,29 @@ public class ProductService : IProductService
 {
     private readonly IRepository<Product> _repo;
     private readonly IHistoryService _history;
-    public ProductService(IRepository<Product> repo, IHistoryService history)
+    private readonly IValidator<ProductValidationDto> _productValidator;
+    
+    public ProductService(
+        IRepository<Product> repo, 
+        IHistoryService history,
+        IValidator<ProductValidationDto> productValidator)
     {
-        _repo = repo; _history = history;
+        _repo = repo; 
+        _history = history;
+        _productValidator = productValidator;
     }
 
     public Product Create(string name, decimal price)
     {
-        var p = new Product { Name = name, Price = price };
+        var validationDto = new ProductValidationDto { Name = name, Price = price };
+        var validationResult = _productValidator.Validate(validationDto);
+        
+        if (!validationResult.IsValid)
+        {
+            throw new ArgumentException($"Dados inválidos: {string.Join(", ", validationResult.Errors)}");
+        }
+
+        var p = new Product { Name = name.Trim(), Price = price };
         _repo.Add(p);
         _history.Record(p, "Created");
         return p;
@@ -34,10 +51,18 @@ public class ProductService : IProductService
 
     public Product? Update(Guid id, string name, decimal price)
     {
+        var validationDto = new ProductValidationDto { Name = name, Price = price };
+        var validationResult = _productValidator.Validate(validationDto);
+        
+        if (!validationResult.IsValid)
+        {
+            throw new ArgumentException($"Dados inválidos: {string.Join(", ", validationResult.Errors)}");
+        }
+
         var product = _repo.Get(id);
         if (product == null) return null;
 
-        product.Name = name;
+        product.Name = name.Trim();
         product.Price = price;
         _repo.Update(product);
         _history.Record(product, "Updated");

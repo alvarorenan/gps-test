@@ -36,7 +36,6 @@ import { CpfFormatterService } from '../services/cpf-formatter.service';
               maxlength="14">
             <div class="invalid-feedback" *ngIf="clientForm.get('cpf')?.invalid && clientForm.get('cpf')?.touched">
               <div *ngIf="clientForm.get('cpf')?.errors?.['required']">CPF é obrigatório</div>
-              <div *ngIf="clientForm.get('cpf')?.errors?.['pattern']">CPF deve ter formato válido (000.000.000-00)</div>
             </div>
           </div>
           <div class="col-md-4">
@@ -78,8 +77,8 @@ import { CpfFormatterService } from '../services/cpf-formatter.service';
                   <input *ngIf="editingId === c.id" 
                          [(ngModel)]="editForm.name" 
                          class="form-control form-control-sm"
-                         [class.is-invalid]="editForm.name.trim().length < 2"
-                         placeholder="Nome mínimo 2 caracteres">
+                         [class.is-invalid]="editForm.name.trim().length === 0"
+                         placeholder="Nome obrigatório">
                 </td>
                 <td>
                   <span *ngIf="editingId !== c.id">{{formatCpfDisplay(c.cpf)}}</span>
@@ -87,7 +86,7 @@ import { CpfFormatterService } from '../services/cpf-formatter.service';
                          [(ngModel)]="editForm.cpf" 
                          class="form-control form-control-sm"
                          [class.is-invalid]="editForm.cpf.trim().length === 0"
-                         placeholder="000.000.000-00"
+                         placeholder="CPF obrigatório"
                          maxlength="14"
                          (input)="formatEditCpf($event)">
                 </td>
@@ -141,7 +140,7 @@ export class ClientListComponent implements OnInit {
   constructor() {
     this.clientForm = this.fb.group({
       name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
-      cpf: ['', [Validators.required]]
+      cpf: ['', [Validators.required]] // Apenas obrigatório, validação completa no backend
     });
   }
 
@@ -229,14 +228,9 @@ export class ClientListComponent implements OnInit {
   }
 
   saveEdit(id: string) {
-    // Validações básicas
+    // Validações básicas de UX apenas
     if (!this.editForm.name.trim()) {
       alert('Nome é obrigatório');
-      return;
-    }
-
-    if (this.editForm.name.trim().length < 2) {
-      alert('Nome deve ter pelo menos 2 caracteres');
       return;
     }
 
