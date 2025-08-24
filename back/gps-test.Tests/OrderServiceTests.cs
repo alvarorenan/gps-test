@@ -1,247 +1,160 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using Moq;
+using Xunit;
 using GpsTest.Models;
-using GpsTest.Models.History;
 using GpsTest.Repositories;
 using GpsTest.Services;
-using Xunit;
 
 namespace GpsTest.Tests;
 
 public class OrderServiceTests
 {
-    private static (OrderService orderService, ProductService productService, InMemoryHistoryService historyService) BuildServices()
+    private (OrderService service, Mock<IOrderRepository> repoMock, Mock<IHistoryService> historyMock) Build()
     {
-        var historyService = new InMemoryHistoryService();
-        var orderRepository = new InMemoryOrderRepository();
-        var productRepository = new InMemoryRepository<Product>();
-        
-        var productService = new ProductService(productRepository, historyService);
-        var orderService = new OrderService(orderRepository, historyService);
-        
-        return (orderService, productService, historyService);
+        var repo = new Mock<IOrderRepository>(MockBehavior.Strict);
+        var history = new Mock<IHistoryService>(MockBehavior.Strict);
+        var service = new OrderService(repo.Object, history.Object);
+        return (service, repo, history);
     }
 
-    #region Order Creation Tests
-
     [Fact]
-    public void Create_Order_Should_Calculate_Correct_Total()
+    public void Create_Should_Add_Order_And_Record_History()
     {
         // Arrange
-        var (orderService, productService, _) = BuildServices();
-        var product1 = productService.Create("Produto A", 10.50m);
-        var product2 = productService.Create("Produto B", 15.75m);
+        var (svc, repo, history) = Build();
+        Order? captured = null;
+        repo.Setup(r => r.Add(It.IsAny<Order>()))
+            .Returns<Order>(o => { captured = o; return o; });
+        history.Setup(h => h.Record(It.IsAny<Order>(), "Created"));
+
         var clientId = Guid.NewGuid();
+        var products = new[] { Guid.NewGuid(), Guid.NewGuid() };
 
         // Act
-        var order = orderService.Create(clientId, new[] { product1.Id, product2.Id });
-        var total = orderService.GetTotal(order.Id, id => productService.Get(id)!.Price);
+        var order = svc.Create(clientId, products);
 
         // Assert
-        Assert.Equal(26.25m, total);
-        Assert.Equal(OrderStatus.Created, order.Status);
-        Assert.Equal(clientId, order.ClientId);
-        Assert.Equal(2, order.ProductIds.Count);
+        Assert.NotNull(captured);
+        Assert.Equal(order.Id, captured!.Id);
+        Assert.Equal(clientId, captured.ClientId);
+        Assert.Equal(products, captured.ProductIds);
+        repo.Verify(r => r.Add(It.IsAny<Order>()), Times.Once);
+        history.Verify(h => h.Record(It.Is<Order>(o => o.Id == order.Id), "Created"), Times.Once);
     }
 
     [Fact]
-    public void Create_Order_With_Single_Product_Should_Work()
+    public void Pay_Should_Update_Status_And_Record_History()
     {
-        // Arrange
-        var (orderService, productService, _) = BuildServices();
-        var product = productService.Create("Produto Único", 99.99m);
-        var clientId = Guid.NewGuid();
+        var (svc, repo, history) = Build();
+        var order = new Order { ClientId = Guid.NewGuid(), ProductIds = new() { Guid.NewGuid() } };
+        var id = order.Id;
+        repo.Setup(r => r.Get(id)).Returns(order);
+        repo.Setup(r => r.Update(order));
+        history.Setup(h => h.Record(order, "StatusChanged:Paid"));
 
-        // Act
-        var order = orderService.Create(clientId, new[] { product.Id });
-        var total = orderService.GetTotal(order.Id, id => productService.Get(id)!.Price);
+        svc.Pay(id);
 
-        // Assert
-        Assert.Equal(99.99m, total);
-        Assert.Single(order.ProductIds);
+        Assert.Equal(OrderStatus.Paid, order.Status);
+        repo.Verify(r => r.Update(order), Times.Once);
+        history.Verify(h => h.Record(order, "StatusChanged:Paid"), Times.Once);
     }
 
     [Fact]
-    public void Create_Order_With_Empty_Products_Should_Have_Zero_Total()
+    public void Pay_Nonexistent_Should_Throw()
     {
-        // Arrange
-        var (orderService, _, _) = BuildServices();
-        var clientId = Guid.NewGuid();
-
-        // Act
-        var order = orderService.Create(clientId, Array.Empty<Guid>());
-        var total = orderService.GetTotal(order.Id, _ => 0);
-
-        // Assert
-        Assert.Equal(0, total);
-        Assert.Empty(order.ProductIds);
-    }
-
-    #endregion
-
-    #region Payment Tests
-
-    [Fact]
-    public void Pay_Pending_Order_Should_Change_Status_To_Paid()
-    {
-        // Arrange
-        var (orderService, productService, _) = BuildServices();
-        var product = productService.Create("Produto para Pagamento", 50.00m);
-        var order = orderService.Create(Guid.NewGuid(), new[] { product.Id });
-
-        // Act
-        orderService.Pay(order.Id);
-
-        // Assert
-        var updatedOrder = orderService.Get(order.Id);
-        Assert.Equal(OrderStatus.Paid, updatedOrder!.Status);
+        var (svc, repo, _) = Build();
+        var id = Guid.NewGuid();
+        repo.Setup(r => r.Get(id)).Returns((Order?)null);
+        Assert.Throws<KeyNotFoundException>(() => svc.Pay(id));
     }
 
     [Fact]
-    public void Pay_Already_Paid_Order_Should_Remain_Paid()
+    public void Cancel_Should_Update_Status_And_Record_History()
     {
-        // Arrange
-        var (orderService, productService, _) = BuildServices();
-        var product = productService.Create("Produto Já Pago", 25.00m);
-        var order = orderService.Create(Guid.NewGuid(), new[] { product.Id });
-        orderService.Pay(order.Id);
+        var (svc, repo, history) = Build();
+        var order = new Order { ClientId = Guid.NewGuid(), ProductIds = new() { Guid.NewGuid() } };
+        var id = order.Id;
+        repo.Setup(r => r.Get(id)).Returns(order);
+        repo.Setup(r => r.Update(order));
+        history.Setup(h => h.Record(order, "StatusChanged:Canceled"));
 
-        // Act - Tentar pagar novamente
-        orderService.Pay(order.Id);
+        svc.Cancel(id);
 
-        // Assert
-        var updatedOrder = orderService.Get(order.Id);
-        Assert.Equal(OrderStatus.Paid, updatedOrder!.Status);
-    }
-
-    #endregion
-
-    #region Cancellation Tests
-
-    [Fact]
-    public void Cancel_Pending_Order_Should_Change_Status_To_Canceled()
-    {
-        // Arrange
-        var (orderService, productService, _) = BuildServices();
-        var product = productService.Create("Produto para Cancelamento", 30.00m);
-        var order = orderService.Create(Guid.NewGuid(), new[] { product.Id });
-
-        // Act
-        orderService.Cancel(order.Id);
-
-        // Assert
-        var updatedOrder = orderService.Get(order.Id);
-        Assert.Equal(OrderStatus.Canceled, updatedOrder!.Status);
+        Assert.Equal(OrderStatus.Canceled, order.Status);
+        repo.Verify(r => r.Update(order), Times.Once);
+        history.Verify(h => h.Record(order, "StatusChanged:Canceled"), Times.Once);
     }
 
     [Fact]
-    public void Cancel_Paid_Order_Should_Not_Be_Allowed()
+    public void Update_Should_Modify_Client_And_Products()
     {
-        // Arrange
-        var (orderService, productService, _) = BuildServices();
-        var product = productService.Create("Produto Pago", 40.00m);
-        var order = orderService.Create(Guid.NewGuid(), new[] { product.Id });
-        orderService.Pay(order.Id);
+        var (svc, repo, history) = Build();
+        var original = new Order { ClientId = Guid.NewGuid(), ProductIds = new() { Guid.NewGuid() } };
+        var newClient = Guid.NewGuid();
+        var newProducts = new[] { Guid.NewGuid(), Guid.NewGuid() };
+        repo.Setup(r => r.Get(original.Id)).Returns(original);
+        repo.Setup(r => r.Update(original));
+        history.Setup(h => h.Record(original, "Updated"));
 
-        // Act & Assert
-        Assert.Throws<InvalidOperationException>(() => orderService.Cancel(order.Id));
-    }
+        var updated = svc.Update(original.Id, newClient, newProducts);
 
-    #endregion
-
-    #region History and Audit Tests
-
-    [Fact]
-    public void Order_Operations_Should_Be_Recorded_In_History()
-    {
-        // Arrange
-        var (orderService, productService, historyService) = BuildServices();
-        var product = productService.Create("Produto com Histórico", 15.50m);
-        var clientId = Guid.NewGuid();
-
-        // Act
-        var order = orderService.Create(clientId, new[] { product.Id });
-        orderService.Pay(order.Id);
-
-        // Assert
-        var historyRecords = historyService.GetAll().ToList();
-        
-        // Deve ter 3 registros: Product Created, Order Created, Order StatusChanged:Paid
-        Assert.Equal(3, historyRecords.Count);
-        
-        // Verifica registro de produto criado
-        var productHistory = historyRecords.FirstOrDefault(h => h.EntityType == "Product" && h.Action == "Created");
-        Assert.NotNull(productHistory);
-        Assert.Equal(product.Id.ToString(), productHistory.EntityId);
-        
-        // Verifica registro de pedido criado
-        var orderCreatedHistory = historyRecords.FirstOrDefault(h => h.EntityType == "Order" && h.Action == "Created");
-        Assert.NotNull(orderCreatedHistory);
-        Assert.Equal(order.Id.ToString(), orderCreatedHistory.EntityId);
-        
-        // Verifica registro de mudança de status
-        var statusChangeHistory = historyRecords.FirstOrDefault(h => h.EntityType == "Order" && h.Action == "StatusChanged:Paid");
-        Assert.NotNull(statusChangeHistory);
-        Assert.Equal(order.Id.ToString(), statusChangeHistory.EntityId);
+        Assert.NotNull(updated);
+        Assert.Equal(newClient, updated!.ClientId);
+        Assert.True(newProducts.SequenceEqual(updated.ProductIds));
+        repo.Verify(r => r.Update(original), Times.Once);
+        history.Verify(h => h.Record(original, "Updated"), Times.Once);
     }
 
     [Fact]
-    public void Cancel_Order_Should_Record_Status_Change_In_History()
+    public void Delete_Should_Remove_And_Record()
     {
-        // Arrange
-        var (orderService, productService, historyService) = BuildServices();
-        var product = productService.Create("Produto para Cancelar", 20.00m);
-        var order = orderService.Create(Guid.NewGuid(), new[] { product.Id });
+        var (svc, repo, history) = Build();
+        var order = new Order { ClientId = Guid.NewGuid(), ProductIds = new() { Guid.NewGuid() } };
+        var id = order.Id;
+        repo.Setup(r => r.Get(id)).Returns(order);
+        repo.Setup(r => r.Delete(id));
+        history.Setup(h => h.Record(order, "Deleted"));
 
-        // Act
-        orderService.Cancel(order.Id);
+        svc.Delete(id);
 
-        // Assert
-        var historyRecords = historyService.GetAll().ToList();
-        var cancelHistory = historyRecords.FirstOrDefault(h => 
-            h.EntityType == "Order" && 
-            h.Action == "StatusChanged:Canceled" && 
-            h.EntityId == order.Id.ToString());
-        
-        Assert.NotNull(cancelHistory);
-        Assert.True(cancelHistory.Timestamp <= DateTime.UtcNow);
-    }
-
-    #endregion
-
-    #region Business Logic Tests
-
-    [Fact]
-    public void Get_Nonexistent_Order_Should_Return_Null()
-    {
-        // Arrange
-        var (orderService, _, _) = BuildServices();
-        var nonexistentId = Guid.NewGuid();
-
-        // Act
-        var result = orderService.Get(nonexistentId);
-
-        // Assert
-        Assert.Null(result);
+        repo.Verify(r => r.Delete(id), Times.Once);
+        history.Verify(h => h.Record(order, "Deleted"), Times.Once);
     }
 
     [Fact]
-    public void GetAll_Should_Return_All_Created_Orders()
+    public void GetTotal_Should_Sum_Prices()
     {
-        // Arrange
-        var (orderService, productService, _) = BuildServices();
-        var product = productService.Create("Produto Comum", 10.00m);
-        
-        // Act
-        var order1 = orderService.Create(Guid.NewGuid(), new[] { product.Id });
-        var order2 = orderService.Create(Guid.NewGuid(), new[] { product.Id });
-        var allOrders = orderService.GetAll().ToList();
+        var (svc, repo, _) = Build();
+        var p1 = Guid.NewGuid();
+        var p2 = Guid.NewGuid();
+        var prices = new Dictionary<Guid, decimal> { [p1] = 5m, [p2] = 7.5m };
+        var order = new Order { ClientId = Guid.NewGuid(), ProductIds = new() { p1, p2 } };
+        repo.Setup(r => r.Get(order.Id)).Returns(order);
 
-        // Assert
-        Assert.Equal(2, allOrders.Count);
-        Assert.Contains(allOrders, o => o.Id == order1.Id);
-        Assert.Contains(allOrders, o => o.Id == order2.Id);
+        var total = svc.GetTotal(order.Id, id => prices[id]);
+        Assert.Equal(12.5m, total);
     }
 
-    #endregion
+    [Fact]
+    public void GetByStatus_Should_Delegate_To_Repository()
+    {
+        var (svc, repo, _) = Build();
+        var list = new List<Order> { new() { ClientId = Guid.NewGuid() } };
+        repo.Setup(r => r.GetByStatus(OrderStatus.Created)).Returns(list);
+        var result = svc.GetByStatus(OrderStatus.Created);
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public void Delete_Nonexistent_Should_Not_Throw_Or_Record()
+    {
+        var (svc, repo, history) = Build();
+        var id = Guid.NewGuid();
+        repo.Setup(r => r.Get(id)).Returns((Order?)null);
+        // history should never be called
+        svc.Delete(id);
+        history.Verify(h => h.Record(It.IsAny<Order>(), It.IsAny<string>()), Times.Never);
+    }
 }

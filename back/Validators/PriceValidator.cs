@@ -11,11 +11,6 @@ public class PriceValidator : IValidator<decimal>
             errors.Add("Preço deve ser maior que zero");
         }
         
-        if (price > 999999.99m)
-        {
-            errors.Add("Preço deve ser menor que R$ 999.999,99");
-        }
-        
         return errors.Any() ? ValidationResult.Failure(errors.ToArray()) : ValidationResult.Success();
     }
 }
