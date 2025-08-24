@@ -25,7 +25,7 @@ builder.Services.AddScoped<IRepository<Client>, EfRepository<Client>>();
 builder.Services.AddScoped<IRepository<Product>, EfRepository<Product>>();
 builder.Services.AddScoped<IOrderRepository, EfOrderRepository>();
 
-// Validators (following SOLID principles)
+// Validators 
 builder.Services.AddScoped<CpfValidator>();
 builder.Services.AddScoped<NameValidator>();
 builder.Services.AddScoped<PriceValidator>();
