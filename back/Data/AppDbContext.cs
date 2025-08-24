@@ -22,6 +22,14 @@ public class AppDbContext : DbContext
             v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
             v => JsonSerializer.Deserialize<List<Guid>>(v, (JsonSerializerOptions?)null) ?? new List<Guid>());
 
+        // Client configuration
+        modelBuilder.Entity<Client>(e =>
+        {
+            e.HasIndex(c => c.Cpf).IsUnique();
+            e.Property(c => c.Cpf).HasMaxLength(11).IsRequired();
+            e.Property(c => c.Name).HasMaxLength(100).IsRequired();
+        });
+
         modelBuilder.Entity<Order>(e =>
         {
             e.Property(o => o.ProductIds)

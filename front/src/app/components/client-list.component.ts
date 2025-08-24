@@ -3,6 +3,7 @@ import { ClientService } from '../services';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormsModule } from '@angular/forms';
 import { Client } from '../models';
+import { CpfFormatterService } from '../services/cpf-formatter.service';
 
 @Component({
   standalone:true,
@@ -51,7 +52,11 @@ import { Client } from '../models';
         
         <!-- Mensagem de erro geral -->
         <div *ngIf="showValidationError" class="alert alert-danger alert-dismissible fade show">
-          <strong>Atenção!</strong> Preencha todos os campos obrigatórios corretamente.
+          <strong>Erro de validação:</strong>
+          <ul class="mb-0 mt-1" *ngIf="validationErrors.length > 0">
+            <li *ngFor="let error of validationErrors">{{ error }}</li>
+          </ul>
+          <div *ngIf="validationErrors.length === 0">Preencha todos os campos obrigatórios corretamente.</div>
           <button type="button" class="btn-close" (click)="showValidationError = false"></button>
         </div>
         
@@ -72,13 +77,18 @@ import { Client } from '../models';
                   <span *ngIf="editingId !== c.id">{{c.name}}</span>
                   <input *ngIf="editingId === c.id" 
                          [(ngModel)]="editForm.name" 
-                         class="form-control form-control-sm">
+                         class="form-control form-control-sm"
+                         [class.is-invalid]="editForm.name.trim().length < 2"
+                         placeholder="Nome mínimo 2 caracteres">
                 </td>
                 <td>
                   <span *ngIf="editingId !== c.id">{{formatCpfDisplay(c.cpf)}}</span>
                   <input *ngIf="editingId === c.id" 
                          [(ngModel)]="editForm.cpf" 
                          class="form-control form-control-sm"
+                         [class.is-invalid]="editForm.cpf.trim().length === 0"
+                         placeholder="000.000.000-00"
+                         maxlength="14"
                          (input)="formatEditCpf($event)">
                 </td>
                 <td><small class="text-muted">{{c.id}}</small></td>
@@ -114,21 +124,24 @@ import { Client } from '../models';
 export class ClientListComponent implements OnInit {
   private svc = inject(ClientService);
   private fb = inject(FormBuilder);
+  private cpfFormatter = inject(CpfFormatterService);
   
   clients = signal<Client[]>([]);
   clientForm: FormGroup;
   isSubmitting = false;
   showValidationError = false;
   showSuccessMessage = false;
+  validationErrors: string[] = [];
   
   // Edição inline
   editingId: string | null = null;
   editForm = { name: '', cpf: '' };
+  editValidationErrors: string[] = [];
 
   constructor() {
     this.clientForm = this.fb.group({
       name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
-      cpf: ['', [Validators.required, Validators.pattern(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/)]]
+      cpf: ['', [Validators.required]]
     });
   }
 
@@ -137,36 +150,28 @@ export class ClientListComponent implements OnInit {
   }
 
   refresh() { 
-    this.svc.list().subscribe(cs => this.clients.set(cs)); 
+    this.svc.list().subscribe((cs: Client[]) => this.clients.set(cs)); 
   }
 
   formatCpf(event: any) {
-    let value = event.target.value.replace(/\D/g, '');
+    const input = event.target;
+    const cleanValue = this.cpfFormatter.limitTo11Digits(input.value);
+    const formattedValue = this.cpfFormatter.format(cleanValue);
     
-    if (value.length <= 11) {
-      value = value.replace(/(\d{3})(\d)/, '$1.$2');
-      value = value.replace(/(\d{3})(\d)/, '$1.$2');
-      value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-    }
-    
-    event.target.value = value;
-    this.clientForm.patchValue({ cpf: value });
+    input.value = formattedValue;
+    this.clientForm.patchValue({ cpf: formattedValue });
   }
 
   formatCpfDisplay(cpf: string): string {
-    if (!cpf) return '';
-    const cleaned = cpf.replace(/\D/g, '');
-    if (cleaned.length === 11) {
-      return cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-    }
-    return cpf;
+    return this.cpfFormatter.formatForDisplay(cpf);
   }
 
   add() {
-    // Marcar todos os campos como touched para mostrar validações
+    // Validações básicas no frontend
     this.clientForm.markAllAsTouched();
     
     if (this.clientForm.invalid) {
+      this.validationErrors = ['Por favor, preencha todos os campos obrigatórios'];
       this.showValidationError = true;
       this.showSuccessMessage = false;
       setTimeout(() => this.showValidationError = false, 5000);
@@ -175,14 +180,14 @@ export class ClientListComponent implements OnInit {
 
     this.isSubmitting = true;
     this.showValidationError = false;
+    this.validationErrors = [];
     
     const formValue = this.clientForm.value;
-    // Remove formatação do CPF para enviar apenas números
-    const cpfNumbers = formValue.cpf.replace(/\D/g, '');
+    const cleanCpf = this.cpfFormatter.clean(formValue.cpf);
     
     this.svc.create({
       name: formValue.name.trim(),
-      cpf: cpfNumbers
+      cpf: cleanCpf
     }).subscribe({
       next: () => {
         this.clientForm.reset();
@@ -191,8 +196,17 @@ export class ClientListComponent implements OnInit {
         this.refresh();
         setTimeout(() => this.showSuccessMessage = false, 3000);
       },
-      error: () => {
+      error: (error: any) => {
         this.isSubmitting = false;
+        if (error.error?.error) {
+          this.validationErrors = [error.error.error];
+        } else if (error.status === 409) {
+          this.validationErrors = ['CPF já está cadastrado no sistema'];
+        } else if (error.status === 400) {
+          this.validationErrors = ['Dados inválidos. Verifique os campos'];
+        } else {
+          this.validationErrors = ['Erro ao criar cliente. Tente novamente'];
+        }
         this.showValidationError = true;
         setTimeout(() => this.showValidationError = false, 5000);
       }
@@ -203,29 +217,58 @@ export class ClientListComponent implements OnInit {
     this.editingId = client.id;
     this.editForm = {
       name: client.name,
-      cpf: this.formatCpfDisplay(client.cpf)
+      cpf: this.cpfFormatter.formatForDisplay(client.cpf)
     };
+    this.editValidationErrors = [];
   }
 
   cancelEdit() {
     this.editingId = null;
     this.editForm = { name: '', cpf: '' };
+    this.editValidationErrors = [];
   }
 
   saveEdit(id: string) {
-    const cpfNumbers = this.editForm.cpf.replace(/\D/g, '');
+    // Validações básicas
+    if (!this.editForm.name.trim()) {
+      alert('Nome é obrigatório');
+      return;
+    }
+
+    if (this.editForm.name.trim().length < 2) {
+      alert('Nome deve ter pelo menos 2 caracteres');
+      return;
+    }
+
+    if (!this.editForm.cpf.trim()) {
+      alert('CPF é obrigatório');
+      return;
+    }
+    
+    const cleanCpf = this.cpfFormatter.clean(this.editForm.cpf);
     
     this.svc.update(id, {
       name: this.editForm.name.trim(),
-      cpf: cpfNumbers
+      cpf: cleanCpf
     }).subscribe({
       next: () => {
         this.editingId = null;
+        this.editValidationErrors = [];
         this.refresh();
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('Erro ao atualizar cliente:', error);
-        alert('Erro ao atualizar cliente');
+        let errorMessage = 'Erro ao atualizar cliente';
+        
+        if (error.error?.error) {
+          errorMessage = error.error.error;
+        } else if (error.status === 409) {
+          errorMessage = 'CPF já está cadastrado em outro cliente';
+        } else if (error.status === 400) {
+          errorMessage = 'Dados inválidos. Verifique os campos';
+        }
+        
+        alert(errorMessage);
       }
     });
   }
@@ -245,14 +288,11 @@ export class ClientListComponent implements OnInit {
   }
 
   formatEditCpf(event: any) {
-    let value = event.target.value.replace(/\D/g, '');
+    const input = event.target;
+    const cleanValue = this.cpfFormatter.limitTo11Digits(input.value);
+    const formattedValue = this.cpfFormatter.format(cleanValue);
     
-    if (value.length <= 11) {
-      value = value.replace(/(\d{3})(\d)/, '$1.$2');
-      value = value.replace(/(\d{3})(\d)/, '$1.$2');
-      value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-    }
-    
-    this.editForm.cpf = value;
+    this.editForm.cpf = formattedValue;
+    input.value = formattedValue;
   }
 }

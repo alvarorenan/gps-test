@@ -3,6 +3,7 @@ using GpsTest.Models;
 using GpsTest.Repositories;
 using GpsTest.Services;
 using GpsTest.Data;
+using GpsTest.Validators;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
 
@@ -23,6 +24,23 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
 builder.Services.AddScoped<IRepository<Client>, EfRepository<Client>>();
 builder.Services.AddScoped<IRepository<Product>, EfRepository<Product>>();
 builder.Services.AddScoped<IOrderRepository, EfOrderRepository>();
+
+// Validators (following SOLID principles)
+builder.Services.AddScoped<IValidator<string>>(provider => 
+{
+    // Composite validator for names using Named instances
+    return new CompositeValidator<string>().AddValidator(new NameValidator());
+});
+
+builder.Services.AddScoped<CpfValidator>();
+builder.Services.AddScoped<NameValidator>();
+
+builder.Services.AddScoped<IValidator<ClientValidationDto>>(provider =>
+{
+    var nameValidator = provider.GetRequiredService<NameValidator>();
+    var cpfValidator = provider.GetRequiredService<CpfValidator>();
+    return new ClientValidator(nameValidator, cpfValidator);
+});
 
 // Service Layer
 builder.Services.AddScoped<IHistoryService, HistoryService>();

@@ -18,9 +18,24 @@ public class ClientsController : ControllerBase
     [HttpPost]
     public ActionResult<ClientResponse> Create([FromBody] CreateClientRequest request)
     {
-        var client = _clientService.Create(request.Name, request.Cpf);
-        return CreatedAtAction(nameof(GetById), new { id = client.Id }, 
-            new ClientResponse(client.Id, client.Name, client.Cpf));
+        try
+        {
+            var client = _clientService.Create(request.Name, request.Cpf);
+            return CreatedAtAction(nameof(GetById), new { id = client.Id }, 
+                new ClientResponse(client.Id, client.Name, client.Cpf));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message, type = "validation" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message, type = "conflict" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Erro interno do servidor", type = "server_error" });
+        }
     }
 
     [HttpGet]
@@ -43,11 +58,26 @@ public class ClientsController : ControllerBase
     [HttpPut("{id:guid}")]
     public ActionResult<ClientResponse> Update(Guid id, [FromBody] UpdateClientRequest request)
     {
-        var client = _clientService.Update(id, request.Name, request.Cpf);
-        if (client == null)
-            return NotFound();
+        try
+        {
+            var client = _clientService.Update(id, request.Name, request.Cpf);
+            if (client == null)
+                return NotFound(new { error = "Cliente não encontrado", type = "not_found" });
 
-        return Ok(new ClientResponse(client.Id, client.Name, client.Cpf));
+            return Ok(new ClientResponse(client.Id, client.Name, client.Cpf));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message, type = "validation" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message, type = "conflict" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Erro interno do servidor", type = "server_error" });
+        }
     }
 
     [HttpDelete("{id:guid}")]
