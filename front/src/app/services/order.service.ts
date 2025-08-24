@@ -27,6 +27,10 @@ export class OrderService {
     return this.http.post<Order>(this.base, data);
   }
 
+  update(id: string, data: {clientId: string; productIds: string[]}): Observable<Order> {
+    return this.http.put<Order>(`${this.base}/${id}`, data);
+  }
+
   pay(id: string): Observable<any> {
     return this.http.post(`${this.base}/${id}/pay`, {});
   }

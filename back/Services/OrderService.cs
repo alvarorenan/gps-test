@@ -9,6 +9,7 @@ public interface IOrderService
     Order? Get(Guid id);
     IEnumerable<Order> GetAll();
     IEnumerable<Order> GetByStatus(OrderStatus status);
+    Order? Update(Guid id, Guid clientId, IEnumerable<Guid> productIds);
     void Pay(Guid id);
     void Cancel(Guid id);
     void Delete(Guid id);
@@ -35,6 +36,16 @@ public class OrderService : IOrderService
     public Order? Get(Guid id) => _repo.Get(id);
     public IEnumerable<Order> GetAll() => _repo.GetAll();
     public IEnumerable<Order> GetByStatus(OrderStatus status) => _repo.GetByStatus(status);
+
+    public Order? Update(Guid id, Guid clientId, IEnumerable<Guid> productIds)
+    {
+        var order = _repo.Get(id) ?? throw new KeyNotFoundException("Order not found");
+        order.ClientId = clientId;
+        order.ProductIds = productIds.ToList();
+        _repo.Update(order);
+        _history.Record(order, "Updated");
+        return order;
+    }
 
     public void Pay(Guid id)
     {

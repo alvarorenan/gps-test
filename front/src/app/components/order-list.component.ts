@@ -36,15 +36,49 @@ import { Order, Client, Product, OrderStatus } from '../models';
             <tbody>
               <tr *ngFor="let o of orders()">
                 <td><small class="text-muted">{{o.id.substring(0,8)}}...</small></td>
-                <td>{{clientName(o.clientId)}}</td>
-                <td>{{clientCpf(o.clientId)}}</td>
                 <td>
-                  <div>
+                  <span *ngIf="editingId !== o.id">{{clientName(o.clientId)}}</span>
+                  <select *ngIf="editingId === o.id" 
+                          [(ngModel)]="editForm.clientId" 
+                          class="form-select form-select-sm">
+                    <option value="" disabled>Selecione um cliente</option>
+                    <option *ngFor="let client of clients()" [value]="client.id">
+                      {{client.name}} - {{formatCpf(client.cpf)}}
+                    </option>
+                  </select>
+                </td>
+                <td>
+                  <span *ngIf="editingId !== o.id">{{clientCpf(o.clientId)}}</span>
+                  <span *ngIf="editingId === o.id">{{formatCpf(selectedClientCpf())}}</span>
+                </td>
+                <td>
+                  <div *ngIf="editingId !== o.id">
                     <span class="badge bg-secondary me-1">{{o.productIds.length}} item(s)</span>
                     <div class="small text-muted mt-1">
                       <div *ngFor="let productId of o.productIds">
                         • {{productName(productId)}} - R$ {{productPrice(productId) | number:'1.2-2'}}
                       </div>
+                    </div>
+                  </div>
+                  <div *ngIf="editingId === o.id">
+                    <div class="mb-2">
+                      <label class="form-label small">Produtos do Pedido:</label>
+                      <div *ngFor="let item of editForm.products; let i = index" class="d-flex align-items-center mb-1">
+                        <select [(ngModel)]="item.productId" class="form-select form-select-sm me-2">
+                          <option value="" disabled>Selecione um produto</option>
+                          <option *ngFor="let product of products()" [value]="product.id">
+                            {{product.name}} - R$ {{product.price | number:'1.2-2'}}
+                          </option>
+                        </select>
+                        <input type="number" min="1" [(ngModel)]="item.quantity" 
+                               class="form-control form-control-sm me-2" style="width: 80px" placeholder="Qtd">
+                        <button type="button" class="btn btn-sm btn-danger" (click)="removeProduct(i)">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                      <button type="button" class="btn btn-sm btn-success" (click)="addProduct()">
+                        <i class="fas fa-plus"></i> Adicionar Produto
+                      </button>
                     </div>
                   </div>
                 </td>
@@ -54,16 +88,29 @@ import { Order, Client, Product, OrderStatus } from '../models';
                 </td>
                 <td><strong>R$ {{totals()[o.id] | number:'1.2-2'}}</strong></td>
                 <td>
-                  <button class="btn btn-sm btn-success me-2" (click)="pay(o)" [disabled]="o.status!=='Created'">
-                    Pagar
-                  </button>
-                  <button class="btn btn-sm btn-warning me-2" (click)="cancel(o)" [disabled]="o.status!=='Created'">
-                    Cancelar
-                  </button>
-                  <button class="btn btn-sm btn-danger" (click)="delete(o)" 
-                          [disabled]="o.status==='Paid'" title="Não é possível excluir pedidos pagos">
-                    🗑️
-                  </button>
+                  <div *ngIf="editingId !== o.id">
+                    <button class="btn btn-sm btn-success me-2" (click)="pay(o)" [disabled]="o.status!=='Created'">
+                      Pagar
+                    </button>
+                    <button class="btn btn-sm btn-warning me-2" (click)="cancel(o)" [disabled]="o.status!=='Created'">
+                      Cancelar
+                    </button>
+                    <button class="btn btn-sm btn-info me-2" (click)="startEdit(o)" [disabled]="o.status!=='Created'">
+                      <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button class="btn btn-sm btn-danger" (click)="delete(o)" 
+                            [disabled]="o.status==='Paid'" title="Não é possível excluir pedidos pagos">
+                      🗑️
+                    </button>
+                  </div>
+                  <div *ngIf="editingId === o.id" class="btn-group btn-group-sm">
+                    <button class="btn btn-success" (click)="saveEdit(o.id)">
+                      <i class="fas fa-check"></i> Salvar
+                    </button>
+                    <button class="btn btn-secondary" (click)="cancelEdit()">
+                      <i class="fas fa-times"></i> Cancelar
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -80,12 +127,20 @@ export class OrderListComponent implements OnInit {
   private ordersSvc = inject(OrderService);
   private clientsSvc = inject(ClientService);
   private productsSvc = inject(ProductService);
+  
   orders = signal<Order[]>([]);
   clients = signal<Client[]>([]);
   products = signal<Product[]>([]);
-  status: OrderStatus | '' = ''; // Tornando opcional
+  status: OrderStatus | '' = '';
   statuses: OrderStatus[] = ['Created','Paid','Canceled'];
   totals = signal<Record<string, number>>({});
+  
+  // Edição inline
+  editingId: string | null = null;
+  editForm = {
+    clientId: '',
+    products: [] as Array<{productId: string, quantity: number}>
+  };
   
   ngOnInit(){
     this.clientsSvc.list().subscribe(c=> this.clients.set(c));
@@ -115,6 +170,105 @@ export class OrderListComponent implements OnInit {
   formatDate(dateString: string): string {
     const date = new Date(dateString);
     return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // Métodos de edição
+  startEdit(order: Order) {
+    this.editingId = order.id;
+    this.editForm = {
+      clientId: order.clientId,
+      products: order.productIds.map(productId => ({
+        productId: productId,
+        quantity: 1 // Por padrão, assumimos quantidade 1 para cada produto
+      }))
+    };
+  }
+
+  cancelEdit() {
+    this.editingId = null;
+    this.editForm = {
+      clientId: '',
+      products: []
+    };
+  }
+
+  addProduct() {
+    this.editForm.products.push({
+      productId: '',
+      quantity: 1
+    });
+  }
+
+  removeProduct(index: number) {
+    this.editForm.products.splice(index, 1);
+  }
+
+  selectedClientCpf(): string {
+    const client = this.clients().find((c: Client) => c.id === this.editForm.clientId);
+    return client?.cpf || '';
+  }
+
+  formatCpf(cpf: string): string {
+    if (!cpf) return '';
+    const cleaned = cpf.replace(/\D/g, '');
+    if (cleaned.length === 11) {
+      return cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    }
+    return cpf;
+  }
+
+  saveEdit(orderId: string) {
+    // Validações básicas
+    if (!this.editForm.clientId) {
+      alert('Selecione um cliente');
+      return;
+    }
+
+    if (this.editForm.products.length === 0) {
+      alert('Adicione pelo menos um produto');
+      return;
+    }
+
+    // Verificar se todos os produtos foram selecionados
+    const hasEmptyProduct = this.editForm.products.some(p => !p.productId);
+    if (hasEmptyProduct) {
+      alert('Todos os produtos devem ser selecionados');
+      return;
+    }
+
+    // Verificar quantidades válidas
+    const hasInvalidQuantity = this.editForm.products.some(p => p.quantity <= 0);
+    if (hasInvalidQuantity) {
+      alert('Todas as quantidades devem ser maiores que zero');
+      return;
+    }
+
+    // Converter para o formato esperado pelo backend (array de IDs dos produtos)
+    const productIds = this.editForm.products.flatMap(p => 
+      Array(p.quantity).fill(p.productId)
+    );
+
+    this.ordersSvc.update(orderId, {
+      clientId: this.editForm.clientId,
+      productIds: productIds
+    }).subscribe({
+      next: () => {
+        this.editingId = null;
+        this.load(); // Recarregar a lista
+      },
+      error: (error: any) => {
+        console.error('Erro ao atualizar pedido:', error);
+        let errorMessage = 'Erro ao atualizar pedido';
+        
+        if (error.error?.error) {
+          errorMessage = error.error.error;
+        } else if (error.status === 400) {
+          errorMessage = 'Dados inválidos. Verifique os campos';
+        }
+        
+        alert(errorMessage);
+      }
+    });
   }
   
   pay(o:Order){ this.ordersSvc.pay(o.id).subscribe(()=> this.load()); }

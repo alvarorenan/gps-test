@@ -109,6 +109,34 @@ public class OrdersController : ControllerBase
         }
     }
 
+    [HttpPut("{id:guid}")]
+    public ActionResult<OrderResponse> Update(Guid id, [FromBody] UpdateOrderRequest request)
+    {
+        try
+        {
+            if (!request.ProductIds.Any())
+                return BadRequest(new { error = "Pelo menos um produto é obrigatório", type = "validation" });
+
+            var order = _orderService.Update(id, request.ClientId, request.ProductIds);
+            if (order == null)
+                return NotFound(new { error = "Pedido não encontrado", type = "not_found" });
+
+            return Ok(new OrderResponse(order.Id, order.ClientId, order.ProductIds, order.CreatedAt, order.Status));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message, type = "validation" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message, type = "business_rule" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Erro interno do servidor", type = "server_error" });
+        }
+    }
+
     [HttpDelete("{id:guid}")]
     public ActionResult Delete(Guid id)
     {
